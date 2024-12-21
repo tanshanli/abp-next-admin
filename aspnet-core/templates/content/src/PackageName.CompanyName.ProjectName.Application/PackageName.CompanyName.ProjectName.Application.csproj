@@ -4,13 +4,18 @@
 	<Import Project="../../configureawait.props" />
 
 	<PropertyGroup>
-		<TargetFramework>netstandard2.1</TargetFramework>
+		<TargetFramework>net8.0</TargetFramework>
+		<AssemblyName>PackageName.CompanyName.ProjectName.Application</AssemblyName>
+		<PackageId>PackageName.CompanyName.ProjectName.Application</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
 		<RootNamespace />
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Volo.Abp.Ddd.Application" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="LINGYUN.Abp.Dynamic.Queryable.Application" Version="$(LINGYUNAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.Ddd.Application" />
+		<PackageReference Include="LINGYUN.Abp.Dynamic.Queryable.Application" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -3,11 +3,13 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
 	  <RootNamespace />
+	  <Configurations>Debug;Release;PostgreSQL</Configurations>
+	  <Platforms>AnyCPU</Platforms>
   </PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Volo.Abp.AspNetCore.Mvc" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.Autofac" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.AspNetCore.Mvc" />
+		<PackageReference Include="Volo.Abp.Autofac" />
 	</ItemGroup>
 
   <ItemGroup>

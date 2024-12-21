@@ -2,7 +2,6 @@
 using Elsa;
 using Elsa.Options;
 using Elsa.Rebus.RabbitMq;
-using LINGYUN.Abp.AspNetCore.HttpOverrides.Forwarded;
 using LINGYUN.Abp.BackgroundTasks;
 using LINGYUN.Abp.BlobStoring.OssManagement;
 using LINGYUN.Abp.Elsa.Localization;
@@ -14,15 +13,19 @@ using LINGYUN.Abp.Serilog.Enrichers.UniqueId;
 using Medallion.Threading;
 using Medallion.Threading.Redis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Logging;
 using Microsoft.OpenApi.Models;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Quartz;
 using StackExchange.Redis;
 using System;
@@ -45,14 +48,15 @@ using Volo.Abp.MultiTenancy;
 using Volo.Abp.Quartz;
 using Volo.Abp.Security.Claims;
 using Volo.Abp.Threading;
+using Volo.Abp.Timing;
 using Volo.Abp.VirtualFileSystem;
 
 namespace LY.MicroService.WorkflowManagement;
 
 public partial class WorkflowManagementHttpApiHostModule
 {
+    public static string ApplicationName { get; set; } = "WorkflowService";
     private const string DefaultCorsPolicyName = "Default";
-    private const string ApplicationName = "Workflow";
     private static readonly OneTimeRunner OneTimeRunner = new OneTimeRunner();
 
     private void PreConfigureFeature()
@@ -65,12 +69,6 @@ public partial class WorkflowManagementHttpApiHostModule
 
     private void PreConfigureForwardedHeaders()
     {
-        PreConfigure<AbpForwardedHeadersOptions>(options =>
-        {
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            options.KnownNetworks.Clear();
-            options.KnownProxies.Clear();
-        });
     }
 
     private void PreConfigureApp(IConfiguration configuration)
@@ -137,7 +135,54 @@ public partial class WorkflowManagementHttpApiHostModule
         });
     }
 
-    private void ConfigureBackgroundTasks()
+    private void ConfigureOpenTelemetry(IServiceCollection services, IConfiguration configuration)
+    {
+        var openTelemetryEnabled = configuration["OpenTelemetry:IsEnabled"];
+        if (openTelemetryEnabled.IsNullOrEmpty() || bool.Parse(openTelemetryEnabled))
+        {
+            services.AddOpenTelemetry()
+                .ConfigureResource(resource =>
+                {
+                    resource.AddService(ApplicationName);
+                })
+                .WithTracing(tracing =>
+                {
+                    tracing.AddHttpClientInstrumentation();
+                    tracing.AddAspNetCoreInstrumentation();
+                    tracing.AddCapInstrumentation();
+                    tracing.AddEntityFrameworkCoreInstrumentation();
+                    tracing.AddSource(ApplicationName);
+
+                    var tracingOtlpEndpoint = configuration["OpenTelemetry:Otlp:Endpoint"];
+                    if (!tracingOtlpEndpoint.IsNullOrWhiteSpace())
+                    {
+                        tracing.AddOtlpExporter(otlpOptions =>
+                        {
+                            otlpOptions.Endpoint = new Uri(tracingOtlpEndpoint);
+                        });
+                        return;
+                    }
+
+                    var zipkinEndpoint = configuration["OpenTelemetry:ZipKin:Endpoint"];
+                    if (!zipkinEndpoint.IsNullOrWhiteSpace())
+                    {
+                        tracing.AddZipkinExporter(zipKinOptions =>
+                        {
+                            zipKinOptions.Endpoint = new Uri(zipkinEndpoint);
+                        });
+                        return;
+                    }
+                })
+                .WithMetrics(metrics =>
+                {
+                    metrics.AddRuntimeInstrumentation();
+                    metrics.AddHttpClientInstrumentation();
+                    metrics.AddAspNetCoreInstrumentation();
+                });
+        }
+    }
+
+    private void ConfigureBackgroundTasks(IConfiguration configuration)
     {
         Configure<AbpBackgroundTasksOptions>(options =>
         {
@@ -309,6 +354,14 @@ public partial class WorkflowManagementHttpApiHostModule
         });
     }
 
+    private void ConfigureTiming(IConfiguration configuration)
+    {
+        Configure<AbpClockOptions>(options =>
+        {
+            configuration.GetSection("Clock").Bind(options);
+        });
+    }
+
     private void ConfigureCaching(IConfiguration configuration)
     {
         Configure<AbpDistributedCacheOptions>(options =>
@@ -322,6 +375,24 @@ public partial class WorkflowManagementHttpApiHostModule
             options.ConfigurationOptions = redisConfig;
             options.InstanceName = configuration["Redis:InstanceName"];
         });
+    }
+
+    private void ConfigureMvc(IServiceCollection services, IConfiguration configuration)
+    {
+        Configure<AbpAspNetCoreMvcOptions>(options =>
+        {
+            options.ExposeIntegrationServices = true;
+        });
+
+        Configure<AbpEndpointRouterOptions>(options =>
+        {
+            options.EndpointConfigureActions.Add((builder) =>
+            {
+                builder.Endpoints.MapHealthChecks(configuration["App:HealthChecks"] ?? "/healthz");
+            });
+        });
+
+        services.AddHealthChecks();
     }
 
     private void ConfigureVirtualFileSystem()
@@ -354,11 +425,13 @@ public partial class WorkflowManagementHttpApiHostModule
         }
     }
 
-    private void ConfigureIdentity()
+    private void ConfigureIdentity(IConfiguration configuration)
     {
         Configure<AbpClaimsPrincipalFactoryOptions>(options =>
         {
             options.IsDynamicClaimsEnabled = true;
+            options.RemoteRefreshUrl = configuration["App:RefreshClaimsUrl"] + options.RemoteRefreshUrl;
+
         });
     }
 
@@ -429,20 +502,12 @@ public partial class WorkflowManagementHttpApiHostModule
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
-                options.Authority = configuration["AuthServer:Authority"];
-                options.RequireHttpsMetadata = false;
-                options.Audience = configuration["AuthServer:ApiName"];
-                options.MapInboundClaims = false;
+                configuration.GetSection("AuthServer").Bind(options);
             });
 
         //services.AddElsaJwtBearerAuthentication(options =>
         //{
         //});
-
-        if (isDevelopment)
-        {
-            // services.AddAlwaysAllowAuthorization();
-        }
 
         if (!isDevelopment)
         {
@@ -468,7 +533,7 @@ public partial class WorkflowManagementHttpApiHostModule
                             .ToArray()
                     )
                     .WithAbpExposedHeaders()
-                    .WithExposedHeaders("_AbpWrapResult", "_AbpDontWrapResult")
+                    .WithAbpWrapExposedHeaders()
                     .SetIsOriginAllowedToAllowWildcardSubdomains()
                     .AllowAnyHeader()
                     .AllowAnyMethod()

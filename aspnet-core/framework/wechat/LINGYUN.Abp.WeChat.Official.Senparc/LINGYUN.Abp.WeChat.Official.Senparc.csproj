@@ -1,16 +1,21 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\..\configureawait.props" />
-	<Import Project="..\..\..\common.props" />
+	<Import Project="..\..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\common.props" />
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
+		<AssemblyName>LINGYUN.Abp.WeChat.Official.Senparc</AssemblyName>
+		<PackageId>LINGYUN.Abp.WeChat.Official.Senparc</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
 		<RootNamespace />
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Senparc.Weixin.MP" Version="16.18.9" />
-		<PackageReference Include="Volo.Abp.AspNetCore.Mvc" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Senparc.Weixin.MP" />
+		<PackageReference Include="Volo.Abp.AspNetCore.Mvc" />
 	</ItemGroup>
 
 	<ItemGroup>

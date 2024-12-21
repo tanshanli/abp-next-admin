@@ -1,10 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\..\configureawait.props" />
-	<Import Project="..\..\..\common.props" />
+	<Import Project="..\..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\common.props" />
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
+		<AssemblyName>LINGYUN.Abp.BackgroundTasks.Jobs</AssemblyName>
+		<PackageId>LINGYUN.Abp.BackgroundTasks.Jobs</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
 		<RootNamespace />
 	</PropertyGroup>
 
@@ -17,9 +22,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Volo.Abp.Emailing" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.Sms" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.Http.Client" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.Emailing" />
+		<PackageReference Include="Volo.Abp.Sms" />
+		<PackageReference Include="Volo.Abp.Http.Client" />
 	</ItemGroup>
 
 	<ItemGroup>

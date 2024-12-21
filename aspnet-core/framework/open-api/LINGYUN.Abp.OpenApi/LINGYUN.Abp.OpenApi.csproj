@@ -1,10 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\..\configureawait.props" />
-	<Import Project="..\..\..\common.props" />
+	<Import Project="..\..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\common.props" />
 
 	<PropertyGroup>
-		<TargetFramework>netstandard2.0</TargetFramework>
+		<TargetFrameworks>netstandard2.0;netstandard2.1;net8.0</TargetFrameworks>
+		<AssemblyName>LINGYUN.Abp.OpenApi</AssemblyName>
+		<PackageId>LINGYUN.Abp.OpenApi</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+		<Nullable>enable</Nullable>
 		<RootNamespace />
 	</PropertyGroup>
 
@@ -17,8 +23,9 @@
 	</ItemGroup>
 	
 	<ItemGroup>
-		<PackageReference Include="Volo.Abp.Security" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.Localization" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.Caching" />
+		<PackageReference Include="Volo.Abp.Security" />
+		<PackageReference Include="Volo.Abp.Localization" />
 	</ItemGroup>
 
 </Project>

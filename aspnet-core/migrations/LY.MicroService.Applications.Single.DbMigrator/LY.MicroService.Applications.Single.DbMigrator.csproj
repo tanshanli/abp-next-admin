@@ -1,4 +1,6 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<Import Project="..\..\..\common.secrets.props" />
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
@@ -8,15 +10,15 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Serilog.Extensions.Logging" Version="$(SerilogExtensionsLoggingPackageVersion)" />
-		<PackageReference Include="Serilog.Sinks.File" Version="$(SerilogSinksFilePackageVersion)" />
-		<PackageReference Include="Serilog.Sinks.Console" Version="$(SerilogSinksConsolePackageVersion)" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftPackageVersion)" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="$(MicrosoftEntityFrameworkCorePackageVersion)">
+		<PackageReference Include="Serilog.Extensions.Logging" />
+		<PackageReference Include="Serilog.Sinks.File" />
+		<PackageReference Include="Serilog.Sinks.Console" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Volo.Abp.Autofac" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.Autofac" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -24,23 +26,26 @@
 		<Content Remove="Logs\**" />
 		<EmbeddedResource Remove="Logs\**" />
 		<None Remove="Logs\**" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<None Remove="appsettings.json" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Content Include="appsettings.json">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		<Content Update="appsettings.PostgreSql.json">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		  <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+		  <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</Content>
+		<None Remove="appsettings.PostgreSql.json" />
+		<Content Include="appsettings.PostgreSql.json">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>
 
 	<ItemGroup>
+	  <None Remove="appsettings.Development.json" />
+	  <None Remove="appsettings.Production.json" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<ProjectReference Include="..\..\modules\platform\LINGYUN.Abp.UI.Navigation.VueVbenAdmin\LINGYUN.Abp.UI.Navigation.VueVbenAdmin.csproj" />
-		<ProjectReference Include="..\LY.MicroService.Applications.Single.EntityFrameworkCore\LY.MicroService.Applications.Single.EntityFrameworkCore.csproj" />
+		<ProjectReference Include="..\LY.MicroService.Applications.Single.EntityFrameworkCore.PostgreSql\LY.MicroService.Applications.Single.EntityFrameworkCore.PostgreSql.csproj" />
+		<ProjectReference Include="..\LY.MicroService.Applications.Single.EntityFrameworkCore.MySql\LY.MicroService.Applications.Single.EntityFrameworkCore.Mysql.csproj" />
 	</ItemGroup>
 
 </Project>

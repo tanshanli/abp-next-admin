@@ -8,12 +8,13 @@ using LINGYUN.Abp.BackgroundTasks.ExceptionHandling;
 using LINGYUN.Abp.BackgroundTasks.Jobs;
 using LINGYUN.Abp.BackgroundTasks.Notifications;
 using LINGYUN.Abp.BackgroundTasks.Quartz;
+using LINGYUN.Abp.Claims.Mapping;
 using LINGYUN.Abp.Data.DbMigrator;
 using LINGYUN.Abp.EventBus.CAP;
 using LINGYUN.Abp.ExceptionHandling.Emailing;
-using LINGYUN.Abp.Http.Client.Wrapper;
 using LINGYUN.Abp.Localization.CultureMap;
 using LINGYUN.Abp.LocalizationManagement.EntityFrameworkCore;
+using LINGYUN.Abp.OssManagement;
 using LINGYUN.Abp.Saas.EntityFrameworkCore;
 using LINGYUN.Abp.Serilog.Enrichers.Application;
 using LINGYUN.Abp.Serilog.Enrichers.UniqueId;
@@ -35,6 +36,7 @@ using Volo.Abp.DistributedLocking;
 using Volo.Abp.EntityFrameworkCore.MySQL;
 using Volo.Abp.FeatureManagement.EntityFrameworkCore;
 using Volo.Abp.Http.Client.IdentityModel.Web;
+using Volo.Abp.MailKit;
 using Volo.Abp.Modularity;
 using Volo.Abp.PermissionManagement.EntityFrameworkCore;
 using Volo.Abp.SettingManagement.EntityFrameworkCore;
@@ -52,6 +54,7 @@ namespace LY.MicroService.TaskManagement;
     typeof(AbpAspNetCoreAuthenticationJwtBearerModule),
     typeof(AbpAuthorizationOrganizationUnitsModule),
     typeof(AbpEmailingExceptionHandlingModule),
+    typeof(AbpOssManagementHttpApiClientModule),
     typeof(AbpHttpClientIdentityModelWebModule),
     typeof(AbpAspNetCoreMultiTenancyModule),
     typeof(AbpAspNetCoreMvcLocalizationModule),
@@ -73,10 +76,11 @@ namespace LY.MicroService.TaskManagement;
     typeof(AbpCachingStackExchangeRedisModule),
     typeof(AbpAspNetCoreMvcModule),
     typeof(AbpSwashbuckleModule),
+    typeof(AbpMailKitModule),
     typeof(AbpLocalizationCultureMapModule),
-    typeof(AbpHttpClientWrapperModule),
     typeof(AbpAspNetCoreMvcWrapperModule),
     typeof(AbpAspNetCoreHttpOverridesModule),
+    typeof(AbpClaimsMappingModule),
     typeof(AbpCAPEventBusModule),
     typeof(AbpAutofacModule)
     )]
@@ -86,6 +90,7 @@ public partial class TaskManagementHttpApiHostModule : AbpModule
     {
         var configuration = context.Services.GetConfiguration();
 
+        PreConfigureWrapper();
         PreConfigureFeature();
         PreForwardedHeaders();
         PreConfigureApp(configuration);
@@ -98,18 +103,23 @@ public partial class TaskManagementHttpApiHostModule : AbpModule
         var hostingEnvironment = context.Services.GetHostingEnvironment();
         var configuration = context.Services.GetConfiguration();
 
-        ConfigureIdentity();
+        ConfigureWrapper();
         ConfigureDbContext();
         ConfigureLocalization();
         ConfigureBackgroundTasks();
         ConfigureExceptionHandling();
         ConfigureVirtualFileSystem();
         ConfigureFeatureManagement();
+        ConfigureTiming(configuration);
         ConfigureCaching(configuration);
         ConfigureAuditing(configuration);
+        ConfigureIdentity(configuration);
         ConfigureMultiTenancy(configuration);
         ConfigureSwagger(context.Services);
         ConfigureJsonSerializer(configuration);
+        ConfigureMvc(context.Services, configuration);
+        ConfigureCors(context.Services, configuration);
+        ConfigureOpenTelemetry(context.Services, configuration);
         ConfigureDistributedLock(context.Services, configuration);
         ConfigureSecurity(context.Services, configuration, hostingEnvironment.IsDevelopment());
     }
@@ -120,14 +130,15 @@ public partial class TaskManagementHttpApiHostModule : AbpModule
         var env = context.GetEnvironment();
 
         app.UseForwardedHeaders();
+        app.UseAbpRequestLocalization();
         app.UseStaticFiles();
         app.UseCorrelationId();
         app.UseRouting();
-        app.UseCors();
+        app.UseCors(DefaultCorsPolicyName);
         app.UseAuthentication();
-        app.UseDynamicClaims();
+        app.UseJwtTokenMiddleware();
         app.UseMultiTenancy();
-        app.UseAbpRequestLocalization();
+        app.UseDynamicClaims();
         app.UseAuthorization();
         app.UseSwagger();
         app.UseAbpSwaggerUI(options =>

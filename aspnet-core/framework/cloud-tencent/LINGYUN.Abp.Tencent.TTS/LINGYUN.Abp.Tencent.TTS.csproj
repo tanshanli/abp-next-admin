@@ -1,10 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\..\configureawait.props" />
-	<Import Project="..\..\..\common.props" />
+	<Import Project="..\..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\common.props" />
 
 	<PropertyGroup>
-		<TargetFramework>netstandard2.0</TargetFramework>
+		<TargetFrameworks>netstandard2.0;netstandard2.1;net8.0</TargetFrameworks>
+		<AssemblyName>LINGYUN.Abp.Tencent.TTS</AssemblyName>
+		<PackageId>LINGYUN.Abp.Tencent.TTS</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
 		<RootNamespace />
 		<Description>
 			腾讯云语音合成
@@ -12,9 +17,8 @@
 		</Description>
 	</PropertyGroup>
 
-
 	<ItemGroup>
-    <ProjectReference Include="..\LINGYUN.Abp.Tencent\LINGYUN.Abp.Tencent.csproj" />
-  </ItemGroup>
+		<ProjectReference Include="..\LINGYUN.Abp.Tencent\LINGYUN.Abp.Tencent.csproj" />
+	</ItemGroup>
 
 </Project>

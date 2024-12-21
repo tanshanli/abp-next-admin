@@ -418,12 +418,6 @@ namespace LY.MicroService.RealtimeMessage.EventBus.Distributed
             try
             {
                 Logger.LogDebug($"Sending notification with provider {provider.Name}");
-                var notifacationDataMapping = Options.NotificationDataMappings
-                        .GetMapItemOrDefault(provider.Name, notificationInfo.Name);
-                if (notifacationDataMapping != null)
-                {
-                    notificationInfo.Data = notifacationDataMapping.MappingFunc(notificationInfo.Data);
-                }
                 // 发布
                 await provider.PublishAsync(notificationInfo, subscriptionUsers);
 

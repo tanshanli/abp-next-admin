@@ -1,10 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\..\configureawait.props" />
-	<Import Project="..\..\..\common.props" />
+	<Import Project="..\..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\common.props" />
 
 	<PropertyGroup>
-		<TargetFramework>netstandard2.0</TargetFramework>
+		<TargetFrameworks>netstandard2.0;netstandard2.1;net8.0</TargetFrameworks>
+		<AssemblyName>LINGYUN.Abp.SettingManagement.Application</AssemblyName>
+		<PackageId>LINGYUN.Abp.SettingManagement.Application</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
 		<RootNamespace />
 	</PropertyGroup>
 
@@ -14,11 +19,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Volo.Abp.AspNetCore.Mvc.Contracts" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.Ddd.Application" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.Emailing" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.SettingManagement.Domain" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.SettingManagement.Application.Contracts" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.AspNetCore.Mvc.Contracts" />
+		<PackageReference Include="Volo.Abp.Ddd.Application" />
+		<PackageReference Include="Volo.Abp.Emailing" />
+		<PackageReference Include="Volo.Abp.SettingManagement.Domain" />
+		<PackageReference Include="Volo.Abp.SettingManagement.Application.Contracts" />
 	</ItemGroup>
 
 	<ItemGroup>

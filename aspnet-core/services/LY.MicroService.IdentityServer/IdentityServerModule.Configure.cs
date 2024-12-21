@@ -1,24 +1,29 @@
 ﻿using DotNetCore.CAP;
-using IdentityModel;
-using LINGYUN.Abp.Account;
-using LINGYUN.Abp.AspNetCore.HttpOverrides.Forwarded;
+using LINGYUN.Abp.Identity.Session;
 using LINGYUN.Abp.IdentityServer.IdentityResources;
 using LINGYUN.Abp.Localization.CultureMap;
 using LINGYUN.Abp.Serilog.Enrichers.Application;
 using LINGYUN.Abp.Serilog.Enrichers.UniqueId;
+using LY.MicroService.IdentityServer.Authentication;
 using LY.MicroService.IdentityServer.IdentityResources;
 using Medallion.Threading;
 using Medallion.Threading.Redis;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Logging;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
@@ -27,9 +32,10 @@ using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
+using System.Threading.Tasks;
 using Volo.Abp.Account.Localization;
+using Volo.Abp.AspNetCore.Mvc;
 using Volo.Abp.AspNetCore.Mvc.UI.Bundling;
-using Volo.Abp.AspNetCore.Mvc.UI.Theme.LeptonXLite.Bundling;
 using Volo.Abp.Auditing;
 using Volo.Abp.Caching;
 using Volo.Abp.EntityFrameworkCore;
@@ -49,7 +55,7 @@ namespace LY.MicroService.IdentityServer;
 
 public partial class IdentityServerModule
 {
-    protected const string ApplicationName = "Identity-Server-STS";
+    public static string ApplicationName { get; set; } = "IdentityServer";
     private static readonly OneTimeRunner OneTimeRunner = new OneTimeRunner();
 
     private void PreConfigureFeature()
@@ -62,12 +68,6 @@ public partial class IdentityServerModule
 
     private void PreForwardedHeaders()
     {
-        PreConfigure<AbpForwardedHeadersOptions>(options =>
-        {
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            options.KnownNetworks.Clear();
-            options.KnownProxies.Clear();
-        });
     }
 
     private void PreConfigureApp(IConfiguration configuration)
@@ -131,6 +131,24 @@ public partial class IdentityServerModule
         }
     }
 
+    private void ConfigureMvc(IServiceCollection services, IConfiguration configuration)
+    {
+        Configure<AbpAspNetCoreMvcOptions>(options =>
+        {
+            options.ExposeIntegrationServices = true;
+        });
+
+        Configure<AbpEndpointRouterOptions>(options =>
+        {
+            options.EndpointConfigureActions.Add((builder) =>
+            {
+                builder.Endpoints.MapHealthChecks(configuration["App:HealthChecks"] ?? "/healthz");
+            });
+        });
+
+        services.AddHealthChecks();
+    }
+
     private void ConfigureDbContext()
     {
         Configure<AbpDbContextOptions>(options =>
@@ -183,6 +201,53 @@ public partial class IdentityServerModule
         }
     }
 
+    private void ConfigureOpenTelemetry(IServiceCollection services, IConfiguration configuration)
+    {
+        var openTelemetryEnabled = configuration["OpenTelemetry:IsEnabled"];
+        if (openTelemetryEnabled.IsNullOrEmpty() || bool.Parse(openTelemetryEnabled))
+        {
+            services.AddOpenTelemetry()
+                .ConfigureResource(resource =>
+                {
+                    resource.AddService(ApplicationName);
+                })
+                .WithTracing(tracing =>
+                {
+                    tracing.AddHttpClientInstrumentation();
+                    tracing.AddAspNetCoreInstrumentation();
+                    tracing.AddCapInstrumentation();
+                    tracing.AddEntityFrameworkCoreInstrumentation();
+                    tracing.AddSource(ApplicationName);
+
+                    var tracingOtlpEndpoint = configuration["OpenTelemetry:Otlp:Endpoint"];
+                    if (!tracingOtlpEndpoint.IsNullOrWhiteSpace())
+                    {
+                        tracing.AddOtlpExporter(otlpOptions =>
+                        {
+                            otlpOptions.Endpoint = new Uri(tracingOtlpEndpoint);
+                        });
+                        return;
+                    }
+
+                    var zipkinEndpoint = configuration["OpenTelemetry:ZipKin:Endpoint"];
+                    if (!zipkinEndpoint.IsNullOrWhiteSpace())
+                    {
+                        tracing.AddZipkinExporter(zipKinOptions =>
+                        {
+                            zipKinOptions.Endpoint = new Uri(zipkinEndpoint);
+                        });
+                        return;
+                    }
+                })
+                .WithMetrics(metrics =>
+                {
+                    metrics.AddRuntimeInstrumentation();
+                    metrics.AddHttpClientInstrumentation();
+                    metrics.AddAspNetCoreInstrumentation();
+                });
+        }
+    }
+
     private void ConfigureCaching(IConfiguration configuration)
     {
         Configure<AbpDistributedCacheOptions>(options =>
@@ -212,6 +277,7 @@ public partial class IdentityServerModule
         Configure<AbpClaimsPrincipalFactoryOptions>(options =>
         {
             options.IsDynamicClaimsEnabled = true;
+            options.IsRemoteRefreshEnabled = false;
         });
     }
     private void ConfigureVirtualFileSystem()
@@ -261,12 +327,19 @@ public partial class IdentityServerModule
             options.UiCulturesMaps.Add(zhHansCultureMapInfo);
         });
     }
-    private void ConfigureAuditing()
+    private void ConfigureAuditing(IConfiguration configuration)
     {
         Configure<AbpAuditingOptions>(options =>
         {
             // options.IsEnabledForGetRequests = true;
             options.ApplicationName = ApplicationName;
+            // 是否启用实体变更记录
+            var allEntitiesSelectorIsEnabled = configuration["Auditing:AllEntitiesSelector"];
+            if (allEntitiesSelectorIsEnabled.IsNullOrWhiteSpace() ||
+                (bool.TryParse(allEntitiesSelectorIsEnabled, out var enabled) && enabled))
+            {
+                options.EntityHistorySelectors.AddAllEntities();
+            }
         });
     }
     private void ConfigureUrls(IConfiguration configuration)
@@ -286,13 +359,12 @@ public partial class IdentityServerModule
     }
     private void ConfigureSecurity(IServiceCollection services, IConfiguration configuration, bool isDevelopment = false)
     {
-        services.AddAuthentication()
-                .AddJwtBearer(options =>
-                {
-                    options.Authority = configuration["AuthServer:Authority"];
-                    options.RequireHttpsMetadata = false;
-                    options.Audience = configuration["AuthServer:ApiName"];
-                });
+        services
+            .AddAuthentication()
+            .AddJwtBearer(options =>
+            {
+                configuration.GetSection("AuthServer").Bind(options);
+            });
 
         if (isDevelopment)
         {
@@ -309,6 +381,16 @@ public partial class IdentityServerModule
         }
 
         services.AddSameSiteCookiePolicy();
+        // 处理cookie中过时的ajax请求判断
+        services.Replace(ServiceDescriptor.Scoped<CookieAuthenticationHandler, AbpCookieAuthenticationHandler>());
+
+        Configure<CookieAuthenticationOptions>(options =>
+        {
+            options.Events.OnSigningOut = (context) =>
+            {
+                return Task.CompletedTask;
+            };
+        });
     }
     private void ConfigureMultiTenancy(IConfiguration configuration)
     {
@@ -345,8 +427,7 @@ public partial class IdentityServerModule
                             .ToArray()
                     )
                     .WithAbpExposedHeaders()
-                    // 引用 LINGYUN.Abp.AspNetCore.Mvc.Wrapper 包时可替换为 WithAbpWrapExposedHeaders
-                    .WithExposedHeaders("_AbpWrapResult", "_AbpDontWrapResult")
+                    .WithAbpWrapExposedHeaders()
                     .SetIsOriginAllowedToAllowWildcardSubdomains()
                     .AllowAnyHeader()
                     .AllowAnyMethod()

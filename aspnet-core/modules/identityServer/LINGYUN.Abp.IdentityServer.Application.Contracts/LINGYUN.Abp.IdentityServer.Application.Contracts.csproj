@@ -1,10 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\..\configureawait.props" />
-	<Import Project="..\..\..\common.props" />
+	<Import Project="..\..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\common.props" />
 
 	<PropertyGroup>
-		<TargetFramework>netstandard2.0</TargetFramework>
+		<TargetFrameworks>netstandard2.0;netstandard2.1;net8.0</TargetFrameworks>
+		<AssemblyName>LINGYUN.Abp.IdentityServer.Application.Contracts</AssemblyName>
+		<PackageId>LINGYUN.Abp.IdentityServer.Application.Contracts</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
 		<RootNamespace />
 	</PropertyGroup>
 
@@ -19,9 +24,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Volo.Abp.Ddd.Application.Contracts" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.Authorization" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.IdentityServer.Domain.Shared" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.Ddd.Application.Contracts" />
+		<PackageReference Include="Volo.Abp.Authorization" />
+		<PackageReference Include="Volo.Abp.IdentityServer.Domain.Shared" />
 	</ItemGroup>
 
 </Project>

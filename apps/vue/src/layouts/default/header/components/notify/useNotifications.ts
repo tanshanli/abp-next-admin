@@ -7,13 +7,13 @@ import {
   NotificationSeverity,
   NotificationReadState,
   NotificationContentType,
-} from '/@/api/messages/model/notificationsModel';
+} from '/@/api/messages/notifications/model';
 import { formatToDateTime } from '/@/utils/dateUtil';
 import { TabItem, ListItem as Notification } from './data';
 import { formatPagedRequest } from '/@/utils/http/abp/helper';
 import { NotifyEventEnum } from '/@/enums/imEnum';
 import { useSignalR } from '/@/hooks/web/useSignalR';
-import { useLocalization } from '/@/hooks/abp/useLocalization';
+import { useNotificationSerializer } from '/@/hooks/abp/useNotificationSerializer';
 import errorAvatar from '/@/assets/icons/64x64/color-error.png';
 import warningAvatar from '/@/assets/icons/64x64/color-warning.png';
 import infoAvatar from '/@/assets/icons/64x64/color-info.png';
@@ -22,13 +22,14 @@ import successAvatar from '/@/assets/icons/64x64/color-success.png';
 import emitter from '/@/utils/eventBus';
 
 export function useNotifications() {
+  const { deserialize } = useNotificationSerializer();
   const notifierRef = ref<TabItem>({
     key: '1',
     name: '通知',
     list: [],
   });
   const signalR = useSignalR({
-    serverUrl: '/signalr-hubs/signalr-hubs/notifications',
+    serverUrl: '/signalr-hubs/notifications',
   });
 
   onMounted(() => {
@@ -44,58 +45,29 @@ export function useNotifications() {
   });
 
   function onNotifyReceived(notificationInfo: NotificationInfo, notifer?: boolean) {
-    const { data } = notificationInfo;
-    let title = data.extraProperties.title;
-    let message = data.extraProperties.message;
-    let description = data.extraProperties.description;
-    if (!data.extraProperties) {
+    if (notifer && notificationInfo.type === NotificationType.ServiceCallback) {
+      // 以通知名称来发起服务端回调
+      emitter.emit(notificationInfo.name, notificationInfo);
       return;
     }
-    if (data.extraProperties.L === true || data.extraProperties.L === 'true') {
-      // TODO: 后端统一序列化格式
-      const { L } = useLocalization(
-        [data.extraProperties.title.resourceName ?? data.extraProperties.title.ResourceName,
-        data.extraProperties.message.resourceName ?? data.extraProperties.message.ResourceName,
-        data.extraProperties.description?.resourceName ?? data.extraProperties.description?.ResourceName ?? "AbpUi"]);
-      title = L(
-        data.extraProperties.title.name ?? data.extraProperties.title.Name,
-        data.extraProperties.title.values ?? data.extraProperties.title.Values,
-      );
-      message = L(
-        data.extraProperties.message.name ?? data.extraProperties.message.Name,
-        data.extraProperties.message.values ?? data.extraProperties.message.Values,
-      );
-      if (description) {
-        description = L(
-          data.extraProperties.description.name ?? data.extraProperties.description.Name,
-          data.extraProperties.description.values ?? data.extraProperties.description.Values,
-        );
-      }
-    }
+    const { title, message, description, creationTime, contentType, severity, type, data } =
+      deserialize(notificationInfo);
     const notifier: Notification = {
       id: notificationInfo.id,
-      avatar: data.extraProperties.avatar,
+      avatar: data.avatar,
       title: title,
       description: message,
       extra: description,
-      datetime: formatToDateTime(notificationInfo.creationTime, 'YYYY-MM-DD HH:mm:ss'),
-      type: String(notificationInfo.type),
-      contentType: notificationInfo.contentType,
+      datetime: formatToDateTime(creationTime, 'YYYY-MM-DD HH:mm:ss'),
+      type: String(type),
+      contentType: contentType,
     };
 
-    if (notifer && notificationInfo.type !== NotificationType.ServiceCallback) {
-      _notification(notifier, notificationInfo.severity);
-    }
-
-    if (notificationInfo.type === NotificationType.ServiceCallback) {
-      emitter.emit(NotifyEventEnum.NOTIFICATIONS_SERVICE_CALLBACK, notificationInfo);
-    } else {
-      emitter.emit(NotifyEventEnum.NOTIFICATIONS_RECEVIED, notificationInfo);
-      notifierRef.value.list.push(notifier);
-    }
+    notifer && _notification(notifier, severity);
+    emitter.emit(NotifyEventEnum.NOTIFICATIONS_RECEVIED, notificationInfo);
+    notifierRef.value.list.push(notifier);
   }
 
-  
   function _notification(notifier: Notification, severity: NotificationSeverity) {
     let message = notifier.description;
     switch (notifier.contentType) {

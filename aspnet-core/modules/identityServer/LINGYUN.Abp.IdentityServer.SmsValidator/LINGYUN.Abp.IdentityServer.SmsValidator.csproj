@@ -1,10 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\..\common.props" />
-	<Import Project="..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\common.props" />
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
+		<AssemblyName>LINGYUN.Abp.IdentityServer.SmsValidator</AssemblyName>
+		<PackageId>LINGYUN.Abp.IdentityServer.SmsValidator</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
 		<RootNamespace />
 	</PropertyGroup>
 
@@ -19,7 +24,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Volo.Abp.IdentityServer.Domain" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.IdentityServer.Domain" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -1,10 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\..\common.props" />
-	<Import Project="..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\common.props" />
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
+		<AssemblyName>LINGYUN.Abp.OpenIddict.WeChat.Work</AssemblyName>
+		<PackageId>LINGYUN.Abp.OpenIddict.WeChat.Work</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
 		<RootNamespace />
 	</PropertyGroup>
 
@@ -14,7 +19,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Volo.Abp.OpenIddict.AspNetCore" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.OpenIddict.AspNetCore" />
 	</ItemGroup>
 
 	<ItemGroup>

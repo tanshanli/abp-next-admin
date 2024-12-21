@@ -1,4 +1,5 @@
 ﻿using LINGYUN.Abp.Data.DbMigrator;
+using LINGYUN.Abp.DataProtection.EntityFrameworkCore;
 using LINGYUN.Abp.Saas.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Volo.Abp.EntityFrameworkCore;
@@ -7,6 +8,7 @@ using Volo.Abp.Modularity;
 using Volo.Abp.EntityFrameworkCore.MySQL;
 #elif SqlServer 
 using Volo.Abp.EntityFrameworkCore.SqlServer;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 #elif Sqlite 
 using Volo.Abp.EntityFrameworkCore.Sqlite;
 #elif Oracle 
@@ -22,7 +24,7 @@ namespace PackageName.CompanyName.ProjectName.EntityFrameworkCore;
 [DependsOn(
     typeof(ProjectNameDomainModule),
     typeof(AbpDataDbMigratorModule),
-    typeof(AbpEntityFrameworkCoreModule),
+    typeof(AbpDataProtectionEntityFrameworkCoreModule),
 #if MySQL
     typeof(AbpEntityFrameworkCoreMySQLModule),
 #elif SqlServer
@@ -49,7 +51,11 @@ public class ProjectNameEntityFrameworkCoreModule : AbpModule
             options.UseMySQL<ProjectNameDbContext>();
 #elif SqlServer
             options.UseSqlServer();
-            options.UseSqlServer<ProjectNameDbContext>();
+            options.UseSqlServer<ProjectNameDbContext>(builder =>
+            {
+                // see https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-transact-sql-compatibility-level?view=sql-server-ver16
+                // builder.UseCompatibilityLevel(150);
+            });
 #elif Sqlite
             options.UseSqlite();
             options.UseSqlite<ProjectNameDbContext>();

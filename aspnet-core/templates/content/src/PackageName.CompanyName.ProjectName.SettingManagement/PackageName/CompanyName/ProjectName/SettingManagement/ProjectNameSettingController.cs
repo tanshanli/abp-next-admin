@@ -1,7 +1,8 @@
-﻿using LINGYUN.Abp.SettingManagement;
+﻿using Asp.Versioning;
+using LINGYUN.Abp.SettingManagement;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using PackageName.CompanyName.ProjectName.Authorization;
+using PackageName.CompanyName.ProjectName.Permissions;
 using System.Threading.Tasks;
 using Volo.Abp;
 using Volo.Abp.AspNetCore.Mvc;

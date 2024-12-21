@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using LINGYUN.Abp.Identity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using System.Linq;
 using System.Threading.Tasks;
@@ -281,6 +282,28 @@ public class SettingAppService : ApplicationService, ISettingAppService, ISettin
 
         #endregion
 
+        #region 会话
+
+        var sessionSetting = identitySetting.AddSetting(L["DisplayName:Identity.Session"], L["Description:Identity.Session"]);
+        sessionSetting.AddDetail(
+            await SettingDefinitionManager.GetAsync(LINGYUN.Abp.Identity.Settings.IdentitySettingNames.Session.ConcurrentLoginStrategy),
+            StringLocalizerFactory,
+            await SettingManager.GetOrNullAsync(LINGYUN.Abp.Identity.Settings.IdentitySettingNames.Session.ConcurrentLoginStrategy, providerName, providerKey),
+            ValueType.Option,
+            providerName)
+            .AddOption(L["ConcurrentLoginStrategy:None"], ConcurrentLoginStrategy.None.ToString())
+            .AddOption(L["ConcurrentLoginStrategy:LogoutFromSameTypeDevicesLimit"], ConcurrentLoginStrategy.LogoutFromSameTypeDevicesLimit.ToString())
+            .AddOption(L["ConcurrentLoginStrategy:LogoutFromSameTypeDevices"], ConcurrentLoginStrategy.LogoutFromSameTypeDevices.ToString())
+            .AddOption(L["ConcurrentLoginStrategy:LogoutFromAllDevices"], ConcurrentLoginStrategy.LogoutFromAllDevices.ToString());
+        sessionSetting.AddDetail(
+            await SettingDefinitionManager.GetAsync(LINGYUN.Abp.Identity.Settings.IdentitySettingNames.Session.LogoutFromSameTypeDevicesLimit),
+            StringLocalizerFactory,
+            await SettingManager.GetOrNullAsync(LINGYUN.Abp.Identity.Settings.IdentitySettingNames.Session.LogoutFromSameTypeDevicesLimit, providerName, providerKey),
+            ValueType.Number,
+            providerName);
+
+        #endregion
+
         #region 密码
 
         var passwordSetting = identitySetting.AddSetting(L["DisplayName:Identity.Password"], L["Description:Identity.Password"]);
@@ -373,91 +396,96 @@ public class SettingAppService : ApplicationService, ISettingAppService, ISettin
 
         #region 邮件设置
 
-        var emailSettingGroup = new SettingGroupDto(L["DisplayName:Emailing"], L["Description:Emailing"]);
-
-        var defaultMailSetting = emailSettingGroup.AddSetting(L["DisplayName:Emailing.Default"], L["Description:Emailing.Default"]);
-        defaultMailSetting.AddDetail(
-            await SettingDefinitionManager.GetAsync(EmailSettingNames.DefaultFromAddress),
-            StringLocalizerFactory,
-            await SettingManager.GetOrNullAsync(EmailSettingNames.DefaultFromAddress, providerName, providerKey),
-            ValueType.String,
-            providerName)
-            .RequiredPermission("SettingManagement.Emailing");
-        defaultMailSetting.AddDetail(
-            await SettingDefinitionManager.GetAsync(EmailSettingNames.DefaultFromDisplayName),
-            StringLocalizerFactory,
-            await SettingManager.GetOrNullAsync(EmailSettingNames.DefaultFromDisplayName, providerName, providerKey),
-            ValueType.String,
-            providerName)
-            .RequiredPermission("SettingManagement.Emailing");
-
-        // 防止邮件设置泄露
-        if (await AuthorizationService.IsGrantedAsync(AbpSettingManagementPermissions.Settings.Manager))
+        if (!CurrentTenant.IsAvailable || 
+            await FeatureChecker.IsEnabledAsync(true, [SettingManagementFeatures.Enable, SettingManagementFeatures.AllowChangingEmailSettings]))
         {
-            var smtpSetting = emailSettingGroup.AddSetting(L["DisplayName:Emailing.Smtp"], L["Description:Emailing.Smtp"]);
-            smtpSetting.AddDetail(
-                await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.EnableSsl),
-                StringLocalizerFactory,
-                await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.EnableSsl, providerName, providerKey),
-                ValueType.Boolean,
-                providerName)
-                .RequiredPermission("SettingManagement.Emailing");
-            smtpSetting.AddDetail(
-                await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.UseDefaultCredentials),
-                StringLocalizerFactory,
-                await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.UseDefaultCredentials, providerName, providerKey),
-                ValueType.Boolean,
-                providerName)
-                .RequiredPermission("SettingManagement.Emailing");
-            smtpSetting.AddDetail(
-                await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.Domain),
-                StringLocalizerFactory,
-                await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.Domain, providerName, providerKey),
-                ValueType.String,
-                providerName)
-                .RequiredPermission("SettingManagement.Emailing");
-            smtpSetting.AddDetail(
-                await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.Host),
-                StringLocalizerFactory,
-                await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.Host, providerName, providerKey),
-                ValueType.String,
-                providerName);
-            smtpSetting.AddDetail(
-                await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.Port),
-                StringLocalizerFactory,
-                await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.Port, providerName, providerKey),
-                ValueType.Number,
-                providerName)
-                .RequiredPermission("SettingManagement.Emailing");
-            smtpSetting.AddDetail(
-                await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.UserName),
-                StringLocalizerFactory,
-                await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.UserName, providerName, providerKey),
-                ValueType.String,
-                providerName)
-                .RequiredPermission("SettingManagement.Emailing");
-            smtpSetting.AddDetail(
-                await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.Password),
-                StringLocalizerFactory,
-                await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.Password, providerName, providerKey),
-                ValueType.String,
-                providerName)
-                .RequiredPermission("SettingManagement.Emailing");
-            // 一个占位符,用于展现发送测试邮件
-            smtpSetting.AddDetail(
-                new SettingDefinition(
-                    name: "SendTestEmail",
-                    displayName: LocalizableString.Create<AbpSettingManagementResource>("DisplayName:Emailing.SendTestEmail"),
-                    description: LocalizableString.Create<AbpSettingManagementResource>("Description:Emailing.SendTestEmail")),
-                StringLocalizerFactory,
-                "",
-                ValueType.String,
-                providerName)
-                .WithSlot("send-test-email")
-                .RequiredPermission("SettingManagement.Emailing");
-        }
+            var emailSettingGroup = new SettingGroupDto(L["DisplayName:Emailing"], L["Description:Emailing"]);
 
-        settingGroups.AddGroup(emailSettingGroup);
+            var defaultMailSetting = emailSettingGroup.AddSetting(L["DisplayName:Emailing.Default"], L["Description:Emailing.Default"]);
+            defaultMailSetting.AddDetail(
+                await SettingDefinitionManager.GetAsync(EmailSettingNames.DefaultFromAddress),
+                StringLocalizerFactory,
+                await SettingManager.GetOrNullAsync(EmailSettingNames.DefaultFromAddress, providerName, providerKey),
+                ValueType.String,
+                providerName)
+                .RequiredPermission("SettingManagement.Emailing");
+            defaultMailSetting.AddDetail(
+                await SettingDefinitionManager.GetAsync(EmailSettingNames.DefaultFromDisplayName),
+                StringLocalizerFactory,
+                await SettingManager.GetOrNullAsync(EmailSettingNames.DefaultFromDisplayName, providerName, providerKey),
+                ValueType.String,
+                providerName)
+                .RequiredPermission("SettingManagement.Emailing");
+
+            // 防止邮件设置泄露
+            if (await AuthorizationService.IsGrantedAsync(AbpSettingManagementPermissions.Settings.Manager))
+            {
+                var smtpSetting = emailSettingGroup.AddSetting(L["DisplayName:Emailing.Smtp"], L["Description:Emailing.Smtp"]);
+                smtpSetting.AddDetail(
+                    await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.EnableSsl),
+                    StringLocalizerFactory,
+                    await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.EnableSsl, providerName, providerKey),
+                    ValueType.Boolean,
+                    providerName)
+                    .RequiredPermission("SettingManagement.Emailing");
+                smtpSetting.AddDetail(
+                    await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.UseDefaultCredentials),
+                    StringLocalizerFactory,
+                    await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.UseDefaultCredentials, providerName, providerKey),
+                    ValueType.Boolean,
+                    providerName)
+                    .RequiredPermission("SettingManagement.Emailing");
+                smtpSetting.AddDetail(
+                    await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.Domain),
+                    StringLocalizerFactory,
+                    await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.Domain, providerName, providerKey),
+                    ValueType.String,
+                    providerName)
+                    .RequiredPermission("SettingManagement.Emailing");
+                smtpSetting.AddDetail(
+                    await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.Host),
+                    StringLocalizerFactory,
+                    await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.Host, providerName, providerKey),
+                    ValueType.String,
+                    providerName);
+                smtpSetting.AddDetail(
+                    await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.Port),
+                    StringLocalizerFactory,
+                    await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.Port, providerName, providerKey),
+                    ValueType.Number,
+                    providerName)
+                    .RequiredPermission("SettingManagement.Emailing");
+                smtpSetting.AddDetail(
+                    await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.UserName),
+                    StringLocalizerFactory,
+                    await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.UserName, providerName, providerKey),
+                    ValueType.String,
+                    providerName)
+                    .RequiredPermission("SettingManagement.Emailing");
+                smtpSetting.AddDetail(
+                    await SettingDefinitionManager.GetAsync(EmailSettingNames.Smtp.Password),
+                    StringLocalizerFactory,
+                    await SettingManager.GetOrNullAsync(EmailSettingNames.Smtp.Password, providerName, providerKey),
+                    ValueType.String,
+                    providerName)
+                    .RequiredPermission("SettingManagement.Emailing");
+                // 一个占位符,用于展现发送测试邮件
+                smtpSetting.AddDetail(
+                    new SettingDefinition(
+                        name: "SendTestEmail",
+                        displayName: LocalizableString.Create<AbpSettingManagementResource>("DisplayName:Emailing.SendTestEmail"),
+                        description: LocalizableString.Create<AbpSettingManagementResource>("Description:Emailing.SendTestEmail")),
+                    StringLocalizerFactory,
+                    "",
+                    ValueType.String,
+                    providerName)
+                    .WithSlot("send-test-email")
+                    .RequiredPermission("SettingManagement.Emailing");
+            }
+
+
+            settingGroups.AddGroup(emailSettingGroup);
+        }
 
         #endregion
 

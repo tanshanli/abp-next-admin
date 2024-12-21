@@ -1,4 +1,4 @@
-import { defAbpHttp } from '/@/utils/http/abp';
+import { defHttp } from '/@/utils/http/axios';
 import {
   OpenIddictApplicationDto,
   OpenIddictApplicationGetListInput,
@@ -6,94 +6,35 @@ import {
   OpenIddictApplicationUpdateDto,
 } from './model';
 
-// export const GetAsyncById = (id: string) => {
-//   return defAbpHttp.request<OpenIddictApplicationDto>({
-//     service: remoteServiceName,
-//     controller: controllerName,
-//     action: 'GetAsync',
-//     uniqueName: 'GetAsyncById',
-//     params: {
-//       id: id,
-//     },
-//   });
-// };
-
-export const GetAsyncById = (id: string) => {
-  return defAbpHttp.get<OpenIddictApplicationDto>({
+export const get = (id: string) => {
+  return defHttp.get<OpenIddictApplicationDto>({
     url: `/api/openiddict/applications/${id}`,
   });
 };
 
-// export const GetListAsyncByInput = (input: OpenIddictApplicationGetListInput) => {
-//   return defAbpHttp.pagedRequest<OpenIddictApplicationDto>({
-//     service: remoteServiceName,
-//     controller: controllerName,
-//     action: 'GetListAsync',
-//     uniqueName: 'GetListAsyncByInput',
-//     params: {
-//       input: input,
-//     },
-//   });
-// };
-
-export const GetListAsyncByInput = (input: OpenIddictApplicationGetListInput) => {
-  return defAbpHttp.get<PagedResultDto<OpenIddictApplicationDto>>({
+export const getList = (input: OpenIddictApplicationGetListInput) => {
+  return defHttp.get<PagedResultDto<OpenIddictApplicationDto>>({
     url: '/api/openiddict/applications',
     params: input,
   });
 };
 
-// export const CreateAsyncByInput = (input: OpenIddictApplicationCreateDto) => {
-//   return defAbpHttp.request<OpenIddictApplicationDto>({
-//     service: remoteServiceName,
-//     controller: controllerName,
-//     action: 'CreateAsync',
-//     uniqueName: 'CreateAsyncByInput',
-//     data: input,
-//   });
-// };
-
-export const CreateAsyncByInput = (input: OpenIddictApplicationCreateDto) => {
-  return defAbpHttp.post<OpenIddictApplicationDto>({
+export const create = (input: OpenIddictApplicationCreateDto) => {
+  return defHttp.post<OpenIddictApplicationDto>({
     url: '/api/openiddict/applications',
     data: input,
   });
 };
 
-// export const UpdateAsyncByIdAndInput = (id: string, input: OpenIddictApplicationUpdateDto) => {
-//   return defAbpHttp.request<OpenIddictApplicationDto>({
-//     service: remoteServiceName,
-//     controller: controllerName,
-//     action: 'UpdateAsync',
-//     uniqueName: 'UpdateAsyncByIdAndInput',
-//     params: {
-//       id: id,
-//     },
-//     data: input,
-//   });
-// };
-
-export const UpdateAsyncByIdAndInput = (id: string, input: OpenIddictApplicationUpdateDto) => {
-  return defAbpHttp.put<OpenIddictApplicationDto>({
+export const update = (id: string, input: OpenIddictApplicationUpdateDto) => {
+  return defHttp.put<OpenIddictApplicationDto>({
     url: `/api/openiddict/applications/${id}`,
     data: input,
   });
 };
 
-// export const DeleteAsyncById = (id: string) => {
-//   return defAbpHttp.request<void>({
-//     service: remoteServiceName,
-//     controller: controllerName,
-//     action: 'DeleteAsync',
-//     uniqueName: 'DeleteAsyncById',
-//     params: {
-//       id: id,
-//     },
-//   });
-// };
-
-export const DeleteAsyncById = (id: string) => {
-  return defAbpHttp.delete<void>({
+export const deleteById = (id: string) => {
+  return defHttp.delete<void>({
     url: `/api/openiddict/applications/${id}`,
   });
 };

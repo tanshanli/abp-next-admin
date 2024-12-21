@@ -14,7 +14,7 @@ if '%3' equ '' goto run
 exit
 
 :run
-dotnet run
+start cmd.exe /c dotnet run --no-build
 goto end
 
 :restore
@@ -22,7 +22,7 @@ dotnet restore
 goto end
 
 :efu
-dotnet ef databse update
+dotnet ef database update
 goto end
 
 :end

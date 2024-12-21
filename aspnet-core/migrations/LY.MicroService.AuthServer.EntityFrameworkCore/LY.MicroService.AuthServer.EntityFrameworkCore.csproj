@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\configureawait.props" />
-	<Import Project="..\..\common.props" />
+	<Import Project="..\..\..\configureawait.props" />
+	<Import Project="..\..\..\common.props" />
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -9,21 +9,24 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="$(MicrosoftEntityFrameworkCorePackageVersion)">
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Volo.Abp.Authorization" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.EntityFrameworkCore.MySql" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.OpenIddict.EntityFrameworkCore" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.PermissionManagement.EntityFrameworkCore" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.Identity.Application.Contracts" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.Authorization" />
+		<PackageReference Include="Volo.Abp.EntityFrameworkCore.MySql" />
+		<PackageReference Include="Volo.Abp.OpenIddict.EntityFrameworkCore" />
+		<PackageReference Include="Volo.Abp.FeatureManagement.EntityFrameworkCore" />
+		<PackageReference Include="Volo.Abp.SettingManagement.EntityFrameworkCore" />
+		<PackageReference Include="Volo.Abp.PermissionManagement.EntityFrameworkCore" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\framework\common\LINGYUN.Abp.Data.DbMigrator\LINGYUN.Abp.Data.DbMigrator.csproj" />
+		<ProjectReference Include="..\..\modules\identity\LINGYUN.Abp.Identity.Application.Contracts\LINGYUN.Abp.Identity.Application.Contracts.csproj" />
 		<ProjectReference Include="..\..\modules\identity\LINGYUN.Abp.Identity.EntityFrameworkCore\LINGYUN.Abp.Identity.EntityFrameworkCore.csproj" />
 		<ProjectReference Include="..\..\modules\saas\LINGYUN.Abp.Saas.EntityFrameworkCore\LINGYUN.Abp.Saas.EntityFrameworkCore.csproj" />
+		<ProjectReference Include="..\..\modules\text-templating\LINGYUN.Abp.TextTemplating.EntityFrameworkCore\LINGYUN.Abp.TextTemplating.EntityFrameworkCore.csproj" />
 	</ItemGroup>
 
 </Project>

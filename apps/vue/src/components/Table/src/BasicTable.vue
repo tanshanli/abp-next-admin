@@ -15,14 +15,15 @@
         <slot :name="item" v-bind="data || {}"></slot>
       </template>
       <template #advanceBefore>
-        <Button
-          v-if="getAdvancedSearchProps?.useAdvancedSearch"
-          type="link"
-          size="small"
-          @click="handleAdvanceSearch"
-        >
-          {{ t('component.table.advancedSearch.title') }}
-        </Button>
+        <Badge v-if="getAdvancedSearchProps?.useAdvancedSearch" :count="advancedSearchInput?.paramters.length">
+          <Button
+            type="link"
+            size="small"
+            @click="handleAdvanceSearch"
+          >
+            {{ t('component.table.advancedSearch.title') }}
+          </Button>
+        </Badge>
       </template>
     </BasicForm>
 
@@ -33,13 +34,17 @@
       v-show="getEmptyDataIsShowTable"
       @change="handleTableChange"
       @resizeColumn="handleResizeColumn"
+      @expand="handleTableExpand"
     >
       <template #[item]="data" v-for="item in Object.keys($slots)" :key="item">
         <slot :name="item" v-bind="data || {}"></slot>
       </template>
       <template #headerCell="{ column }">
-        <HeaderCell :column="column" />
+        <slot name="headerCell" v-bind="{ column }">
+          <HeaderCell :column="column" />
+        </slot>
       </template>
+       <!-- 增加对antdv3.x兼容 -->
       <template #bodyCell="data">
         <slot name="bodyCell" v-bind="data || {}"></slot>
       </template>
@@ -51,7 +56,7 @@
       ref="advancedSearchRef"
       @register="registerAdSearchModal"
       v-bind="getAdvancedSearchProps"
-      @change="handleAdvanceSearchChange"
+      @change="handleAdvanceSearchChanged"
       @search="handleAdvanceSearchInfoChange"
     />
   </div>
@@ -62,16 +67,18 @@
     TableActionType,
     SizeType,
     ColumnChangeParam,
+    InnerMethods,
   } from './types/table';
 
   import { defineComponent, ref, reactive, computed, unref, toRaw, inject, watchEffect, nextTick } from 'vue';
-  import { Button, Table } from 'ant-design-vue';
+  import { Badge, Button, Table } from 'ant-design-vue';
   import { BasicForm, useForm } from '/@/components/Form/index';
   import { useModal } from '/@/components/Modal/index';
   import { PageWrapperFixedHeightKey } from '/@/components/Page';
   import HeaderCell from './components/HeaderCell.vue';
   import AdvancedSearch from './components/AdvancedSearch.vue';
   import { InnerHandlers } from './types/table';
+  import { DynamicQueryable } from './types/advancedSearch';
 
   import { usePagination } from './hooks/usePagination';
   import { useColumns } from './hooks/useColumns';
@@ -100,6 +107,7 @@
     name: 'BasicTable',
     components: {
       Table,
+      Badge,
       BasicForm,
       Button,
       HeaderCell,
@@ -132,6 +140,7 @@
       const wrapRef = ref(null);
       const formRef = ref(null);
       const advancedSearchRef = ref<any>(null);
+      const advancedSearchInput = ref<DynamicQueryable>();
       const innerPropsRef = ref<Partial<BasicTableProps>>();
 
       const { prefixCls } = useDesign('basic-table');
@@ -199,12 +208,12 @@
         emit,
       );
 
-      function handleTableChange(...args) {
-        onTableChange.call(undefined, ...args);
-        emit('change', ...args);
+      function handleTableChange(pagination: any, filters: any, sorter: any, extra: any) {
+        onTableChange(pagination, filters, sorter);
+        emit('change', pagination, filters, sorter);
         // 解决通过useTable注册onChange时不起作用的问题
         const { onChange } = unref(getProps);
-        onChange && isFunction(onChange) && onChange.call(undefined, ...args);
+        onChange && isFunction(onChange) && onChange(pagination, filters, sorter, extra);
       }
 
       const {
@@ -238,7 +247,7 @@
 
       const { getRowClassName } = useTableStyle(getProps, prefixCls);
 
-      const { getExpandOption, expandAll, expandRows, collapseAll } = useTableExpand(
+      const { getExpandOption, expandAll, expandRows, collapseRows, collapseAll, handleTableExpand } = useTableExpand(
         getProps,
         tableData,
         emit,
@@ -255,9 +264,14 @@
         },
       };
 
+      const methods: InnerMethods = {
+        clearSelectedRowKeys,
+        getSelectRowKeys,
+      };
+
       const { getAlertEnabled, getAlertMessage } = useTableAlert(getProps, getRowSelectionRef);
 
-      const { getHeaderProps } = useTableHeader(getProps, slots, handlers, getAlertEnabled, getAlertMessage);
+      const { getHeaderProps } = useTableHeader(getProps, slots, handlers, methods, getAlertEnabled, getAlertMessage);
 
       const { getFooterProps } = useTableFooter(
         getProps,
@@ -265,6 +279,11 @@
         tableElRef,
         getDataSourceRef,
       );
+
+      function handleAdvanceSearchChanged(queryable: DynamicQueryable) {
+        advancedSearchInput.value = queryable;
+        handleAdvanceSearchChange(queryable);
+      }
 
       const {
         getFormProps,
@@ -295,9 +314,9 @@
           footer: unref(getFooterProps),
           ...unref(getExpandOption),
         };
-        if (slots.expandedRowRender) {
-          propsData = omit(propsData, 'scroll');
-        }
+        // if (slots.expandedRowRender) {
+        //   propsData = omit(propsData, 'scroll');
+        // }
 
         propsData = omit(propsData, ['class', 'onChange']);
         return propsData;
@@ -358,6 +377,7 @@
         setCacheColumnsByField,
         expandAll,
         expandRows,
+        collapseRows,
         collapseAll,
         scrollTo,
         getSize: () => {
@@ -390,12 +410,13 @@
         formRef,
         tableElRef,
         advancedSearchRef,
+        advancedSearchInput,
         getBindValues,
         getLoading,
         registerForm,
         handleSearchInfoChange,
         registerAdSearchModal,
-        handleAdvanceSearchChange,
+        handleAdvanceSearchChanged,
         handleAdvanceSearchInfoChange,
         handleSearchInfoReset,
         handleAdvanceSearch,
@@ -412,6 +433,7 @@
         getWrapperClass,
         columns: getViewColumns,
         handleResizeColumn,
+        handleTableExpand,
       };
     },
   });

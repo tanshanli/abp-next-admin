@@ -46,13 +46,13 @@ public class PortalGrantValidator : IExtensionGrantValidator
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public PortalGrantValidator(
-        ILogger<PortalGrantValidator> logger, 
-        IOptions<IdentityServerOptions> options, 
-        IEventService events, 
-        IResourceOwnerPasswordValidator resourceOwnerValidator, 
-        IdentitySecurityLogManager identitySecurityLogManager, 
-        UserManager<IdentityUser> userManager, 
-        ICurrentTenant currentTenant, 
+        ILogger<PortalGrantValidator> logger,
+        IOptions<IdentityServerOptions> options,
+        IEventService events,
+        IResourceOwnerPasswordValidator resourceOwnerValidator,
+        IdentitySecurityLogManager identitySecurityLogManager,
+        UserManager<IdentityUser> userManager,
+        ICurrentTenant currentTenant,
         IEnterpriseRepository enterpriseRepository,
         IOptions<AbpAspNetCoreMultiTenancyOptions> multiTenancyOptions,
         IHttpContextAccessor httpContextAccessor)
@@ -89,7 +89,7 @@ public class PortalGrantValidator : IExtensionGrantValidator
         Guid? tenantId = null;
         using (_currentTenant.Change(null))
         {
-            var enterprise = parameters.Get("EnterpriseId");
+            var enterprise = parameters.Get("enterpriseId") ?? parameters.Get("EnterpriseId");
             if (enterprise.IsNullOrWhiteSpace() || !Guid.TryParse(enterprise, out var enterpriseId))
             {
                 // TODO: configurabled
@@ -175,7 +175,7 @@ public class PortalGrantValidator : IExtensionGrantValidator
                     errorDescription = resourceOwnerContext.Result.ErrorDescription;
                 }
 
-                _logger.LogInformation("User authentication failed: ", errorDescription ?? resourceOwnerContext.Result.Error);
+                _logger.LogInformation("User authentication failed: {0}", errorDescription ?? resourceOwnerContext.Result.Error);
                 await RaiseFailedResourceOwnerAuthenticationEventAsync(userName, errorDescription, context.Request.Client.ClientId);
 
                 context.Result = new GrantValidationResult(TokenRequestErrors.InvalidGrant, errorDescription, resourceOwnerContext.Result.CustomResponse);
@@ -197,7 +197,7 @@ public class PortalGrantValidator : IExtensionGrantValidator
 
             var currentUser = await _userManager.GetUserAsync(resourceOwnerContext.Result.Subject);
 
-            await _events.RaiseAsync(new UserLoginSuccessEvent(userName, currentUser.Id.ToString(), currentUser.Name));
+            await _events.RaiseAsync(new UserLoginSuccessEvent(userName, currentUser.Id.ToString(), currentUser.Name, clientId: resourceOwnerContext.Request.ClientId));
 
             await SetSuccessResultAsync(context, currentUser);
         }

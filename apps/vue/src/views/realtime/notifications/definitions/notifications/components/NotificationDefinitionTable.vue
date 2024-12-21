@@ -27,17 +27,13 @@
         </FormItem>
       </template>
       <template #toolbar>
-        <Button
-          v-auth="['Notifications.Definitions.Create']"
-          type="primary"
-          @click="handleAddNew"
-        >
+        <Button v-auth="['Notifications.Definitions.Create']" type="primary" @click="handleAddNew">
           {{ L('NotificationDefinitions:AddNew') }}
         </Button>
       </template>
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'displayName'">
-          <span>{{ getGroupDisplayName(record.displayName) }}</span>
+          <span>{{ getDisplayName(record.displayName) }}</span>
         </template>
       </template>
       <template #expandedRowRender="{ record }">
@@ -63,7 +59,9 @@
               <span>{{ notificationContentTypeMap[record.contentType] }}</span>
             </template>
             <template v-else-if="column.key === 'providers'">
-              <Tag v-for="provider in record.providers" color="blue" style="margin-right: 5px;">{{ provider }}</Tag>
+              <Tag v-for="provider in record.providers" color="blue" style="margin-right: 5px">{{
+                provider
+              }}</Tag>
             </template>
             <template v-else-if="column.key === 'isStatic'">
               <CheckOutlined v-if="record.isStatic" class="enable" />
@@ -119,10 +117,12 @@
   import { useNotificationDefinition } from '../hooks/useNotificationDefinition';
   import { GetListAsyncByInput as getGroupDefinitions } from '/@/api/realtime/notifications/definitions/groups';
   import { NotificationGroupDefinitionDto } from '/@/api/realtime/notifications/definitions/groups/model';
-  import { GetListAsyncByInput, DeleteAsyncByName } from '/@/api/realtime/notifications/definitions/notifications';
+  import {
+    GetListAsyncByInput,
+    DeleteAsyncByName,
+  } from '/@/api/realtime/notifications/definitions/notifications';
   import { NotificationDefinitionDto } from '/@/api/realtime/notifications/definitions/notifications/model';
   import { getSearchFormSchemas } from '../datas/ModalData';
-  import { groupBy } from '/@/utils/array';
   import { sorter } from '/@/utils/table';
   import NotificationDefinitionModal from './NotificationDefinitionModal.vue';
   import NotificationSendModal from './NotificationSendModal.vue';
@@ -134,7 +134,7 @@
     notifications: NotificationDefinitionDto[];
   }
   interface State {
-    groups: NotificationGroupDefinitionDto[],
+    groups: NotificationGroupDefinitionDto[];
   }
 
   const { deserialize } = useLocalizationSerializer();
@@ -208,14 +208,6 @@
       };
     });
   });
-  const getGroupDisplayName = computed(() => {
-    return (groupName: string) => {
-      const group = state.groups.find(x => x.name === groupName);
-      if (!group) return groupName;
-      const info = deserialize(group.displayName);
-      return Lr(info.resourceName, info.name);
-    };
-  });
   const getDisplayName = computed(() => {
     return (displayName?: string) => {
       if (!displayName) return displayName;
@@ -225,8 +217,7 @@
   });
 
   onMounted(() => {
-    fetch();
-    fetchGroups();
+    fetchGroups().then(fetch);
   });
 
   function fetch() {
@@ -235,28 +226,28 @@
       setLoading(true);
       setTableData([]);
       var input = form.getFieldsValue();
-      GetListAsyncByInput(input).then((res) => {
-        const definitionGroup = groupBy(res.items, 'groupName');
-        const definitionGroupData: NotificationGroup[] = [];
-        Object.keys(definitionGroup).forEach((gk) => {
-          const groupData: NotificationGroup = {
-            name: gk,
-            displayName: gk,
-            notifications: [],
-          };
-          groupData.notifications.push(...definitionGroup[gk]);
-          definitionGroupData.push(groupData);
+      GetListAsyncByInput(input)
+        .then((res) => {
+          const definitionGroupData: NotificationGroup[] = [];
+          state.groups.forEach((group) => {
+            const groupData: NotificationGroup = {
+              name: group.name,
+              displayName: group.displayName,
+              notifications: [],
+            };
+            groupData.notifications.push(...res.items.filter((item) => item.groupName === group.name));
+            definitionGroupData.push(groupData);
+          });
+          setTableData(definitionGroupData);
+        })
+        .finally(() => {
+          setLoading(false);
         });
-        console.log(definitionGroupData);
-        setTableData(definitionGroupData);
-      }).finally(() => {
-        setLoading(false);
-      });
     });
   }
 
   function fetchGroups() {
-    getGroupDefinitions({}).then((res) => {
+    return getGroupDefinitions({}).then((res) => {
       state.groups = res.items;
     });
   }

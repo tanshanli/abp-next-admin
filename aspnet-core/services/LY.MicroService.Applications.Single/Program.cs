@@ -1,3 +1,4 @@
+using LINGYUN.Abp.Identity.Session.AspNetCore;
 using LY.MicroService.Applications.Single;
 using Microsoft.AspNetCore.Cors;
 using Serilog;
@@ -33,8 +34,11 @@ builder.Host.AddAppSettingsSecretsJson()
 
 await builder.AddApplicationAsync<MicroServiceApplicationsSingleModule>(options =>
 {
-    // 搜索 Modules 目录下所有文件作为插件
-    // 取消显示引用所有其他项目的模块，改为通过插件的形式引用
+    MicroServiceApplicationsSingleModule.ApplicationName = Environment.GetEnvironmentVariable("APPLICATION_NAME")
+                    ?? MicroServiceApplicationsSingleModule.ApplicationName;
+    options.ApplicationName = MicroServiceApplicationsSingleModule.ApplicationName;
+    options.Configuration.UserSecretsId = Environment.GetEnvironmentVariable("APPLICATION_USER_SECRETS_ID");
+    options.Configuration.UserSecretsAssembly = typeof(MicroServiceApplicationsSingleModule).Assembly;
     var pluginFolder = Path.Combine(
             Directory.GetCurrentDirectory(), "Modules");
     DirectoryHelper.CreateIfNotExists(pluginFolder);
@@ -52,7 +56,7 @@ if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
 }
-
+// app.UseAbpExceptionHandling();
 app.UseCookiePolicy();
 app.UseMapRequestLocalization();
 app.UseCorrelationId();
@@ -60,10 +64,11 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseCors();
 app.UseAuthentication();
-app.UseAbpClaimsMap();
-app.UseDynamicClaims();
-app.UseAbpOpenIddictValidation();
 app.UseMultiTenancy();
+app.UseUnitOfWork();
+app.UseAbpOpenIddictValidation();
+app.UseAbpSession();
+app.UseDynamicClaims();
 app.UseAuthorization();
 app.UseSwagger();
 app.UseSwaggerUI(options =>

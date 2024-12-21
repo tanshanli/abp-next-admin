@@ -26,6 +26,11 @@
           :text="t('AbpAuditLogging.SecurityLog')"
           icon="ant-design:security-scan-outlined"
         />
+        <MenuItem
+          key="sessions"
+          :text="t('AbpIdentity.IdentitySessions')"
+          icon="carbon:prompt-session"
+        />
         <MenuDivider />
         <MenuItem
           v-if="getUseLockPage"
@@ -42,6 +47,7 @@
     </template>
   </Dropdown>
   <LockAction @register="register" />
+  <SessionModal @register="registerSessionModal" />
   <SecurityLogsModal @register="registerSecurityLogsModal" />
 </template>
 <script lang="ts">
@@ -67,7 +73,7 @@
 
   import { createAsyncComponent } from '/@/utils/factory/createAsyncComponent';
 
-  type MenuEvent = 'logout' | 'doc' | 'lock' | 'setting' | 'center' | 'security-logs';
+  type MenuEvent = 'logout' | 'doc' | 'lock' | 'setting' | 'center' | 'sessions' | 'security-logs';
 
   export default defineComponent({
     name: 'UserDropdown',
@@ -77,7 +83,12 @@
       MenuItem: createAsyncComponent(() => import('./DropMenuItem.vue')),
       MenuDivider: Menu.Divider,
       LockAction: createAsyncComponent(() => import('../lock/LockModal.vue')),
-      SecurityLogsModal: createAsyncComponent(() => import('/@/views/account/security-logs/index.vue')),
+      SessionModal: createAsyncComponent(
+        () => import('/@/views/account/sessions/index.vue'),
+      ),
+      SecurityLogsModal: createAsyncComponent(
+        () => import('/@/views/account/security-logs/index.vue'),
+      ),
     },
     props: {
       theme: propTypes.oneOf(['dark', 'light']),
@@ -95,16 +106,17 @@
         const { avatar, desc, realName, username } = userStore.getUserInfo || {};
         let userName = realName ?? username;
         if (currentTenant.name) {
-          userName = `${currentTenant.name}/${userName}`
+          userName = `${currentTenant.name}/${userName}`;
         }
         return {
           realName: userName,
           avatar: avatar || headerImg,
-          desc
+          desc,
         };
       });
 
       const [register, { openModal }] = useModal();
+      const [registerSessionModal, { openModal: openSessionModal }] = useModal();
       const [registerSecurityLogsModal, { openModal: openSecurityLogsModal }] = useModal();
 
       function handleLock() {
@@ -138,6 +150,9 @@
           case 'center':
             go('/account/center');
             break;
+          case 'sessions':
+           openSessionModal(true, {});
+            break;
           case 'security-logs':
             openSecurityLogsModal(true, {});
             break;
@@ -152,6 +167,7 @@
         getShowDoc,
         register,
         getUseLockPage,
+        registerSessionModal,
         registerSecurityLogsModal,
       };
     },

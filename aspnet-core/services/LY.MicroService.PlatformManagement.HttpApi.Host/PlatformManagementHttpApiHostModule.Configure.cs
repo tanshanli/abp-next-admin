@@ -1,24 +1,27 @@
 ﻿using DotNetCore.CAP;
-using LINGYUN.Abp.AspNetCore.HttpOverrides.Forwarded;
 using LINGYUN.Abp.ExceptionHandling;
 using LINGYUN.Abp.ExceptionHandling.Emailing;
 using LINGYUN.Abp.Localization.CultureMap;
 using LINGYUN.Abp.Serilog.Enrichers.Application;
 using LINGYUN.Abp.Serilog.Enrichers.UniqueId;
+using LINGYUN.Abp.Wrapper;
 using LINGYUN.Platform.Localization;
 using Medallion.Threading;
 using Medallion.Threading.Redis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Logging;
 using Microsoft.OpenApi.Models;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using StackExchange.Redis;
 using System;
 using System.IO;
@@ -27,6 +30,7 @@ using System.Text.Encodings.Web;
 using System.Text.Unicode;
 using System.Threading.Tasks;
 using Volo.Abp;
+using Volo.Abp.AspNetCore.Mvc;
 using Volo.Abp.Auditing;
 using Volo.Abp.BlobStoring;
 using Volo.Abp.BlobStoring.FileSystem;
@@ -34,20 +38,22 @@ using Volo.Abp.Caching;
 using Volo.Abp.EntityFrameworkCore;
 using Volo.Abp.FeatureManagement;
 using Volo.Abp.GlobalFeatures;
+using Volo.Abp.Http.Client;
 using Volo.Abp.Json;
 using Volo.Abp.Json.SystemTextJson;
 using Volo.Abp.Localization;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.Security.Claims;
 using Volo.Abp.Threading;
+using Volo.Abp.Timing;
 using Volo.Abp.VirtualFileSystem;
 
 namespace LY.MicroService.PlatformManagement;
 
 public partial class PlatformManagementHttpApiHostModule
 {
+    public static string ApplicationName { get; set; } = "PlatformService";
     protected const string DefaultCorsPolicyName = "Default";
-    protected const string ApplicationName = "Platform";
     private static readonly OneTimeRunner OneTimeRunner = new OneTimeRunner();
 
     private void PreConfigureFeature()
@@ -60,12 +66,6 @@ public partial class PlatformManagementHttpApiHostModule
 
     private void PreForwardedHeaders()
     {
-        PreConfigure<AbpForwardedHeadersOptions>(options =>
-        {
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            options.KnownNetworks.Clear();
-            options.KnownProxies.Clear();
-        });
     }
 
     private void PreConfigureApp(IConfiguration configuration)
@@ -155,13 +155,13 @@ public partial class PlatformManagementHttpApiHostModule
             {
                 containerConfiguration.UseFileSystem(fileSystem =>
                 {
-                    fileSystem.BasePath = Path.Combine(Directory.GetCurrentDirectory(), "file-blob-storing");
+                    fileSystem.BasePath = Path.Combine(Directory.GetCurrentDirectory(), "blobs");
                 });
             });
         });
     }
 
-    private void ConfigreExceptionHandling()
+    private void ConfigureExceptionHandling()
     {
         // 自定义需要处理的异常
         Configure<AbpExceptionHandlingOptions>(options =>
@@ -216,6 +216,61 @@ public partial class PlatformManagementHttpApiHostModule
         }
     }
 
+    private void ConfigureOpenTelemetry(IServiceCollection services, IConfiguration configuration)
+    {
+        var openTelemetryEnabled = configuration["OpenTelemetry:IsEnabled"];
+        if (openTelemetryEnabled.IsNullOrEmpty() || bool.Parse(openTelemetryEnabled))
+        {
+            services.AddOpenTelemetry()
+                .ConfigureResource(resource =>
+                {
+                    resource.AddService(ApplicationName);
+                })
+                .WithTracing(tracing =>
+                {
+                    tracing.AddHttpClientInstrumentation();
+                    tracing.AddAspNetCoreInstrumentation();
+                    tracing.AddCapInstrumentation();
+                    tracing.AddEntityFrameworkCoreInstrumentation();
+                    tracing.AddSource(ApplicationName);
+
+                    var tracingOtlpEndpoint = configuration["OpenTelemetry:Otlp:Endpoint"];
+                    if (!tracingOtlpEndpoint.IsNullOrWhiteSpace())
+                    {
+                        tracing.AddOtlpExporter(otlpOptions =>
+                        {
+                            otlpOptions.Endpoint = new Uri(tracingOtlpEndpoint);
+                        });
+                        return;
+                    }
+
+                    var zipkinEndpoint = configuration["OpenTelemetry:ZipKin:Endpoint"];
+                    if (!zipkinEndpoint.IsNullOrWhiteSpace())
+                    {
+                        tracing.AddZipkinExporter(zipKinOptions =>
+                        {
+                            zipKinOptions.Endpoint = new Uri(zipkinEndpoint);
+                        });
+                        return;
+                    }
+                })
+                .WithMetrics(metrics =>
+                {
+                    metrics.AddRuntimeInstrumentation();
+                    metrics.AddHttpClientInstrumentation();
+                    metrics.AddAspNetCoreInstrumentation();
+                });
+        }
+    }
+
+    private void ConfigureTiming(IConfiguration configuration)
+    {
+        Configure<AbpClockOptions>(options =>
+        {
+            configuration.GetSection("Clock").Bind(options);
+        });
+    }
+
     private void ConfigureCaching(IConfiguration configuration)
     {
         Configure<AbpDistributedCacheOptions>(options =>
@@ -229,6 +284,24 @@ public partial class PlatformManagementHttpApiHostModule
             options.ConfigurationOptions = redisConfig;
             options.InstanceName = configuration["Redis:InstanceName"];
         });
+    }
+
+    private void ConfigureMvc(IServiceCollection services, IConfiguration configuration)
+    {
+        Configure<AbpAspNetCoreMvcOptions>(options =>
+        {
+            options.ExposeIntegrationServices = true;
+        });
+
+        Configure<AbpEndpointRouterOptions>(options =>
+        {
+            options.EndpointConfigureActions.Add((builder) =>
+            {
+                builder.Endpoints.MapHealthChecks(configuration["App:HealthChecks"] ?? "/healthz");
+            });
+        });
+
+        services.AddHealthChecks();
     }
 
     private void ConfigureVirtualFileSystem()
@@ -261,11 +334,12 @@ public partial class PlatformManagementHttpApiHostModule
         }
     }
 
-    private void ConfigureIdentity()
+    private void ConfigureIdentity(IConfiguration configuration)
     {
         Configure<AbpClaimsPrincipalFactoryOptions>(options =>
         {
             options.IsDynamicClaimsEnabled = true;
+            options.RemoteRefreshUrl = configuration["App:RefreshClaimsUrl"] + options.RemoteRefreshUrl;
         });
     }
 
@@ -339,8 +413,7 @@ public partial class PlatformManagementHttpApiHostModule
                             .ToArray()
                     )
                     .WithAbpExposedHeaders()
-                    // 引用 LINGYUN.Abp.AspNetCore.Mvc.Wrapper 包时可替换为 WithAbpWrapExposedHeaders
-                    .WithExposedHeaders("_AbpWrapResult", "_AbpDontWrapResult")
+                    .WithAbpWrapExposedHeaders()
                     .SetIsOriginAllowedToAllowWildcardSubdomains()
                     .AllowAnyHeader()
                     .AllowAnyMethod()
@@ -354,10 +427,7 @@ public partial class PlatformManagementHttpApiHostModule
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
-                options.Authority = configuration["AuthServer:Authority"];
-                options.RequireHttpsMetadata = false;
-                options.Audience = configuration["AuthServer:ApiName"];
-                options.MapInboundClaims = false;
+                configuration.GetSection("AuthServer").Bind(options);
                 options.Events = new JwtBearerEvents
                 {
                     OnMessageReceived = context =>
@@ -374,11 +444,6 @@ public partial class PlatformManagementHttpApiHostModule
                 };
             });
 
-        if (isDevelopment)
-        {
-            // services.AddAlwaysAllowAuthorization();
-        }
-
         if (!isDevelopment)
         {
             var redis = ConnectionMultiplexer.Connect(configuration["Redis:Configuration"]);
@@ -387,5 +452,34 @@ public partial class PlatformManagementHttpApiHostModule
                 .SetApplicationName("LINGYUN.Abp.Application")
                 .PersistKeysToStackExchangeRedis(redis, "LINGYUN.Abp.Application:DataProtection:Protection-Keys");
         }
+    }
+
+    private void ConfigureWrapper()
+    {
+        Configure<AbpWrapperOptions>(options =>
+        {
+            options.IsEnabled = true;
+        });
+    }
+
+    private void PreConfigureWrapper()
+    {
+        //PreConfigure<AbpDaprClientProxyOptions>(options =>
+        //{
+        //    options.ProxyRequestActions.Add(
+        //        (appid, httprequestmessage) =>
+        //        {
+        //            httprequestmessage.Headers.TryAddWithoutValidation(AbpHttpWrapConsts.AbpDontWrapResult, "true");
+        //        });
+        //});
+        // 服务间调用不包装
+        PreConfigure<AbpHttpClientBuilderOptions>(options =>
+        {
+            options.ProxyClientActions.Add(
+                (_, _, client) =>
+                {
+                    client.DefaultRequestHeaders.TryAddWithoutValidation(AbpHttpWrapConsts.AbpDontWrapResult, "true");
+                });
+        });
     }
 }

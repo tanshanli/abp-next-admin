@@ -4,12 +4,12 @@ WORKDIR /app
 
 COPY . /app
 
-ENV TZ=Asia/Shanghai
-RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo '$TZ' > /etc/timezone
-
 EXPOSE 80/tcp
 VOLUME [ "./app/Logs" ]
+VOLUME [ "./app/blobs" ]
 VOLUME [ "./app/Modules" ]
-VOLUME [ "./app/file-blob-storing" ]
+
+RUN apt update
+RUN apt install wget -y
 
 ENTRYPOINT ["dotnet", "LY.MicroService.PlatformManagement.HttpApi.Host.dll"]

@@ -12,8 +12,12 @@
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'userName'">
           <span>{{ record.userName }}</span>
-          <Tag v-if="lockEnd(record)" style="margin-left: 5px" color="orange">{{ L('Lockout') }}</Tag>
-          <Tag v-if="!record.isActive" style="margin-left: 5px" color="red">{{ L('UnActived') }}</Tag>
+          <Tag v-if="lockEnd(record)" style="margin-left: 5px" color="orange">{{
+            L('Lockout')
+          }}</Tag>
+          <Tag v-if="!record.isActive" style="margin-left: 5px" color="red">{{
+            L('UnActived')
+          }}</Tag>
         </template>
         <template v-if="column.key === 'phoneNumber'">
           <template v-if="record.phoneNumber">
@@ -54,6 +58,11 @@
                 onClick: showLockModal.bind(null, record.id),
               },
               {
+                auth: 'AbpIdentity.IdentitySessions',
+                label: L('IdentitySessions'),
+                onClick: handleShowSessionModal.bind(null, record),
+              },
+              {
                 auth: 'AbpIdentity.Users.Update',
                 label: L('UnLock'),
                 ifShow: lockEnd(record),
@@ -86,6 +95,7 @@
       </template>
     </BasicTable>
     <UserModal @register="registerModal" @change="reloadTable" />
+    <SessionModal @register="registerSessionModal" />
     <PermissionModal @register="registerPermissionModal" />
     <PasswordModal @register="registerPasswordModal" />
     <ClaimModal
@@ -118,13 +128,20 @@
   import { usePassword } from '../hooks/usePassword';
   import { useLock } from '../hooks/useLock';
   import { usePermission as usePermissionModal } from '../hooks/usePermission';
-  import { getListByUser, setUserMenu, setUserStartupMenu } from '/@/api/platform/menu';
-  import { getClaimList as getUserClaims, createClaim, updateClaim, deleteClaim } from '/@/api/identity/user';
+  import { getListByUser, setUserMenu, setUserStartupMenu } from '/@/api/platform/menus';
+  import {
+    getClaimList as getUserClaims,
+    createClaim,
+    updateClaim,
+    deleteClaim,
+  } from '/@/api/identity/users';
+  import { createAsyncComponent } from '/@/utils/factory/createAsyncComponent';
   import UserModal from './UserModal.vue';
   import PasswordModal from './PasswordModal.vue';
   import LockModal from './LockModal.vue';
   import MenuModal from '../../components/MenuModal.vue';
   import ClaimModal from '../../components/ClaimModal.vue';
+  const SessionModal = createAsyncComponent(() => import('./SessionModal.vue'));
 
   const emits = defineEmits(['change']);
 
@@ -137,8 +154,8 @@
   const { registerLockModal, showLockModal, handleUnLock } = useLock({ emit: emits });
   const { registerPasswordModal, showPasswordModal } = usePassword(nullFormElRef);
   const [registerClaimModal, { openModal: openClaimModal }] = useModal();
-  const [registerMenuModal, { openModal: openMenuModal, closeModal: closeMenuModal }] =
-    useModal();
+  const [registerSessionModal, { openModal: openSessionModal }] = useModal();
+  const [registerMenuModal, { openModal: openMenuModal, closeModal: closeMenuModal }] = useModal();
   const { registerModel: registerPermissionModal, showPermissionModal } = usePermissionModal();
 
   function handleSetMenu(record) {
@@ -150,11 +167,13 @@
     setUserMenu({
       userId: userId,
       menuIds: menuIds,
-    }) .then(() => {
-      closeMenuModal();
-    }) .finally(() => {
-      loadMenuRef.value = false;
-    });
+    })
+      .then(() => {
+        closeMenuModal();
+      })
+      .finally(() => {
+        loadMenuRef.value = false;
+      });
   }
 
   function handleAddNew() {
@@ -177,5 +196,9 @@
 
   function handleShowClaims(record) {
     openClaimModal(true, { id: record.id });
+  }
+
+  function handleShowSessionModal(record) {
+    openSessionModal(true, { userId: record.id });
   }
 </script>

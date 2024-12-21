@@ -10,7 +10,7 @@ import { useUserStoreWithOut } from '/@/store/modules/user';
 
 import mitt from '/@/utils/mitt';
 
-interface UseSignalR {
+interface SignalROptions {
   serverUrl: string;
   autoStart?: boolean;
   useAccessToken?: boolean;
@@ -18,18 +18,16 @@ interface UseSignalR {
   nextRetryDelayInMilliseconds?: number;
 }
 
-export function useSignalR({
-  serverUrl,
-  autoStart = false,
-  useAccessToken = true,
-  automaticReconnect = true,
-  nextRetryDelayInMilliseconds = 60000,
-}: UseSignalR) {
+interface UseSignalR {
+  lazyInit?: boolean;
+}
+
+export function useSignalR(options: UseSignalR & SignalROptions) {
   const emitter = mitt();
   let connection: HubConnection | null = null;
 
   onMounted(() => {
-    _initlizaConnection();
+    !options.lazyInit && init(options);
   });
 
   onUnmounted(() => {
@@ -38,7 +36,13 @@ export function useSignalR({
     }
   });
 
-  function _initlizaConnection() {
+  function init({
+    serverUrl,
+    autoStart = false,
+    useAccessToken = true,
+    automaticReconnect = true,
+    nextRetryDelayInMilliseconds = 60000,
+  }: SignalROptions) {
     const httpOptions: IHttpConnectionOptions = {};
     if (useAccessToken) {
       const userStore = useUserStoreWithOut();
@@ -46,10 +50,10 @@ export function useSignalR({
       httpOptions.accessTokenFactory = () =>
         token.startsWith('Bearer ') ? token.substring(7) : token;
     }
-    var connectionBuilder = new HubConnectionBuilder()
+    const connectionBuilder = new HubConnectionBuilder()
       .withUrl(serverUrl, httpOptions)
       .configureLogging(LogLevel.Warning);
-    if (automaticReconnect) {
+    if (automaticReconnect && nextRetryDelayInMilliseconds) {
       connectionBuilder.withAutomaticReconnect({
         nextRetryDelayInMilliseconds: () => nextRetryDelayInMilliseconds,
       });
@@ -65,8 +69,12 @@ export function useSignalR({
       return Promise.reject('unable to start, connection not initialized!');
     }
     emitter.emit('signalR:beforeStart');
-    await connection.start();
-    emitter.emit('signalR:onStart');
+    try {
+      await connection.start();
+      emitter.emit('signalR:onStart');
+    } catch (error) {
+      emitter.emit('signalR:onError', error);
+    }
   }
 
   async function stop(): Promise<void> {
@@ -74,8 +82,12 @@ export function useSignalR({
       return Promise.reject('unable to stop, connection not initialized!');
     }
     emitter.emit('signalR:beforeStop');
-    await connection.stop();
-    emitter.emit('signalR:onStop');
+    try {
+      await connection.stop();
+      emitter.emit('signalR:onStop');
+    } catch (error) {
+      emitter.emit('signalR:onError', error);
+    }
   }
 
   function beforeStart<T = any>(callback: (event?: T) => void) {
@@ -94,6 +106,10 @@ export function useSignalR({
     emitter.on('signalR:onStop', callback);
   }
 
+  function onError(callback: (error?: Error) => void) {
+    emitter.on('signalR:onError', callback);
+  }
+
   function on(methodName: string, newMethod: (...args: any[]) => void): void {
     connection?.on(methodName, newMethod);
   }
@@ -102,7 +118,7 @@ export function useSignalR({
     connection?.off(methodName, method);
   }
 
-  function onclose(callback: (error?: Error) => void): void {
+  function onClose(callback: (error?: Error) => void): void {
     connection?.onclose(callback);
   }
 
@@ -123,7 +139,9 @@ export function useSignalR({
   return {
     on,
     off,
-    onclose,
+    init,
+    onError,
+    onClose,
     beforeStart,
     onStart,
     beforeStop,

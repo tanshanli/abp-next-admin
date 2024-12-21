@@ -9,9 +9,11 @@ ENV TZ=Asia/Shanghai
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo '$TZ' > /etc/timezone
 
 EXPOSE 80/tcp
+VOLUME [ "./app/blobs" ]
 VOLUME [ "./app/Logs" ]
 VOLUME [ "./app/Modules" ]
-VOLUME [ "./app/blobs" ]
-VOLUME [ "./app/wwwroot" ]
+
+RUN apt update
+RUN apt install wget -y
 
 ENTRYPOINT ["dotnet", "LY.MicroService.Applications.Single.dll"]

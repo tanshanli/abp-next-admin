@@ -128,11 +128,17 @@ public class QuartzJobListener : JobListenerSupport, ISingletonDependency
                 jobEventData.RepeatCount = simpleTrigger.RepeatCount;
             }
             jobEventData.Description = context.JobDetail.Description;
-            jobEventData.RunTime = Clock.Now;
-            jobEventData.LastRunTime = context.PreviousFireTimeUtc?.LocalDateTime
-                 ?? context.Trigger.GetPreviousFireTimeUtc()?.LocalDateTime;
-            jobEventData.NextRunTime = context.NextFireTimeUtc?.LocalDateTime
-                ?? context.Trigger.GetNextFireTimeUtc()?.LocalDateTime;
+            jobEventData.RunTime = Clock.Normalize(context.FireTimeUtc.LocalDateTime);
+            var lastRunTime = context.PreviousFireTimeUtc?.LocalDateTime ?? context.Trigger.GetPreviousFireTimeUtc()?.LocalDateTime;
+            if (lastRunTime.HasValue)
+            {
+                jobEventData.LastRunTime = Clock.Normalize(lastRunTime.Value);
+            }
+            var nextRunTime = context.NextFireTimeUtc?.LocalDateTime ?? context.Trigger.GetNextFireTimeUtc()?.LocalDateTime;
+            if (nextRunTime.HasValue)
+            {
+                jobEventData.NextRunTime = Clock.Normalize(nextRunTime.Value);
+            }
             if (context.Result != null)
             {
                 jobEventData.Result = context.Result?.ToString();

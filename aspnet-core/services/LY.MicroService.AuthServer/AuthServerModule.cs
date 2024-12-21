@@ -1,15 +1,18 @@
-﻿using DotNetCore.CAP;
-using LINGYUN.Abp.Account;
+﻿using LINGYUN.Abp.Account;
 using LINGYUN.Abp.AspNetCore.HttpOverrides;
+using LINGYUN.Abp.AspNetCore.Mvc.Wrapper;
 using LINGYUN.Abp.AuditLogging.Elasticsearch;
 using LINGYUN.Abp.Authentication.QQ;
 using LINGYUN.Abp.Authentication.WeChat;
 using LINGYUN.Abp.Data.DbMigrator;
 using LINGYUN.Abp.EventBus.CAP;
+using LINGYUN.Abp.Identity.AspNetCore.Session;
 using LINGYUN.Abp.Identity.EntityFrameworkCore;
 using LINGYUN.Abp.Identity.OrganizaztionUnits;
+using LINGYUN.Abp.Identity.Session.AspNetCore;
 using LINGYUN.Abp.Localization.CultureMap;
 using LINGYUN.Abp.LocalizationManagement.EntityFrameworkCore;
+using LINGYUN.Abp.OpenIddict.AspNetCore.Session;
 using LINGYUN.Abp.OpenIddict.LinkUser;
 using LINGYUN.Abp.OpenIddict.Portal;
 using LINGYUN.Abp.OpenIddict.Sms;
@@ -28,14 +31,13 @@ using Microsoft.Extensions.Hosting;
 using Volo.Abp;
 using Volo.Abp.Account.Web;
 using Volo.Abp.AspNetCore.Mvc.UI.Theme.LeptonXLite;
-using Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared;
 using Volo.Abp.AspNetCore.Serilog;
 using Volo.Abp.Autofac;
 using Volo.Abp.Caching.StackExchangeRedis;
 using Volo.Abp.EntityFrameworkCore.MySQL;
 using Volo.Abp.FeatureManagement.EntityFrameworkCore;
 using Volo.Abp.Identity;
-using Volo.Abp.Identity.AspNetCore;
+using Volo.Abp.MailKit;
 using Volo.Abp.Modularity;
 using Volo.Abp.OpenIddict.EntityFrameworkCore;
 using Volo.Abp.PermissionManagement.EntityFrameworkCore;
@@ -56,7 +58,8 @@ namespace LY.MicroService.AuthServer;
     typeof(AbpEntityFrameworkCoreMySQLModule),
     typeof(AbpIdentityEntityFrameworkCoreModule),
     typeof(AbpIdentityApplicationModule),
-    typeof(AbpIdentityAspNetCoreModule),
+    typeof(AbpIdentityAspNetCoreSessionModule),
+    typeof(AbpOpenIddictAspNetCoreSessionModule),
     typeof(AbpOpenIddictEntityFrameworkCoreModule),
     typeof(AbpOpenIddictSmsModule),
     typeof(AbpOpenIddictWeChatModule),
@@ -76,8 +79,10 @@ namespace LY.MicroService.AuthServer;
     typeof(AuthServerMigrationsEntityFrameworkCoreModule),
     typeof(AbpDataDbMigratorModule),
     typeof(AbpAuditLoggingElasticsearchModule), // 放在 AbpIdentity 模块之后,避免被覆盖
-    typeof(AbpAspNetCoreHttpOverridesModule),
     typeof(AbpLocalizationCultureMapModule),
+    typeof(AbpAspNetCoreMvcWrapperModule),
+    typeof(AbpAspNetCoreHttpOverridesModule),
+    typeof(AbpMailKitModule),
     typeof(AbpCAPEventBusModule),
     typeof(AbpAliyunSmsModule)
     )]
@@ -111,10 +116,13 @@ public partial class AuthServerModule : AbpModule
         ConfigureLocalization();
         ConfigureDataSeeder();
         ConfigureUrls(configuration);
+        ConfigureTiming(configuration);
         ConfigureAuditing(configuration);
         ConfigureMultiTenancy(configuration);
         ConfigureJsonSerializer(configuration);
+        ConfigureMvc(context.Services, configuration);
         ConfigureCors(context.Services, configuration);
+        ConfigureOpenTelemetry(context.Services, configuration);
         ConfigureDistributedLocking(context.Services, configuration);
         ConfigureSeedWorker(context.Services, hostingEnvironment.IsDevelopment());
         ConfigureSecurity(context.Services, configuration, hostingEnvironment.IsDevelopment());
@@ -126,26 +134,27 @@ public partial class AuthServerModule : AbpModule
         var env = context.GetEnvironment();
 
         app.UseForwardedHeaders();
+        app.UseMapRequestLocalization();
         if (env.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();
         }
         else
         {
-            app.UseErrorPage();
+            // app.UseErrorPage();
             app.UseHsts();
         }
-        app.UseMapRequestLocalization();
         // app.UseHttpsRedirection();
         app.UseCookiePolicy();
         app.UseCorrelationId();
         app.UseStaticFiles();
         app.UseRouting();
         app.UseCors(DefaultCorsPolicyName);
-        app.UseWeChatSignature();
         app.UseAuthentication();
         app.UseAbpOpenIddictValidation();
         app.UseMultiTenancy();
+        app.UseAbpSession();
+        app.UseDynamicClaims();
         app.UseAuthorization();
         app.UseAuditing();
         app.UseAbpSerilogEnrichers();

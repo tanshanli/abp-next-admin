@@ -1,26 +1,28 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<Import Project="..\..\..\common.secrets.props" />
 	
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net8.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<Configurations>Debug;Release;PostgreSQL</Configurations>
+		<Platforms>AnyCPU</Platforms>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Serilog.Extensions.Logging" Version="$(SerilogExtensionsLoggingPackageVersion)" />
-		<PackageReference Include="Serilog.Sinks.File" Version="$(SerilogSinksFilePackageVersion)" />
-		<PackageReference Include="Serilog.Sinks.Console" Version="$(SerilogSinksConsolePackageVersion)" />
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftPackageVersion)" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="$(MicrosoftEntityFrameworkCorePackageVersion)">
+		<PackageReference Include="Serilog.Extensions.Logging" />
+		<PackageReference Include="Serilog.Sinks.File" />
+		<PackageReference Include="Serilog.Sinks.Console" />
+		<PackageReference Include="Serilog.Settings.Configuration" />
+		<PackageReference Include="Microsoft.Extensions.Hosting" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Volo.Abp.Autofac" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.EntityFrameworkCore.MySql" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.FeatureManagement.EntityFrameworkCore" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.SettingManagement.EntityFrameworkCore" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Volo.Abp.PermissionManagement.EntityFrameworkCore" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.Autofac" />
+		<PackageReference Include="Volo.Abp.EntityFrameworkCore.MySql" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -31,27 +33,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <None Remove="appsettings.json" />
-	  <None Remove="appsettings.*.json" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Content Include="appsettings.json">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	    <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-	    <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-	  </Content>
-	  <Content Include="appsettings.*.json">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	    <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-	    <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-	  </Content>
-	</ItemGroup>
-
-	<ItemGroup>
-	  <ProjectReference Include="..\..\modules\platform\LINGYUN.Abp.UI.Navigation.VueVbenAdmin\LINGYUN.Abp.UI.Navigation.VueVbenAdmin.csproj" />
-	  <ProjectReference Include="..\..\modules\platform\LINGYUN.Platform.EntityFrameworkCore\LINGYUN.Platform.EntityFrameworkCore.csproj" />
-	  <ProjectReference Include="..\..\modules\saas\LINGYUN.Abp.Saas.EntityFrameworkCore\LINGYUN.Abp.Saas.EntityFrameworkCore.csproj" />
 	  <ProjectReference Include="..\LY.MicroService.Platform.EntityFrameworkCore\LY.MicroService.Platform.EntityFrameworkCore.csproj" />
 	</ItemGroup>
 

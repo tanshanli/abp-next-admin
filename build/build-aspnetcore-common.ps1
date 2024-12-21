@@ -16,7 +16,8 @@ $serviceArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/services/LY.
 $serviceArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/services/LY.MicroService.TaskManagement.HttpApi.Host/"; Service = "task-management" }
 $serviceArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/services/LY.MicroService.WebhooksManagement.HttpApi.Host/"; Service = "webhooks" }
 $serviceArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/services/LY.MicroService.WorkflowManagement.HttpApi.Host/"; Service = "workflow" }
-$serviceArray += [PsObject]@{ Path = $rootFolder + "/../gateways/internal/LINGYUN.MicroService.Internal.ApiGateway/src/LINGYUN.MicroService.Internal.ApiGateway/"; Service = "internal-apigateway" }
+$serviceArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/services/LY.MicroService.WechatManagement.HttpApi.Host/"; Service = "wechat" }
+$serviceArray += [PsObject]@{ Path = $rootFolder + "/../gateways/internal/LINGYUN.MicroService.Internal.ApiGateway/src/LINGYUN.MicroService.Internal.Gateway/"; Service = "internal-apigateway" }
 
 [PsObject[]]$solutionArray = @()
 $solutionArray += [PsObject]@{ File = $rootFolder + "/../aspnet-core/LINGYUN.MicroService.All.sln" }
@@ -25,10 +26,10 @@ $solutionArray += [PsObject]@{ File = $rootFolder + "/../aspnet-core/LINGYUN.Mic
 $solutionArray += [PsObject]@{ File = $rootFolder + "/../aspnet-core/LINGYUN.MicroService.WebhooksManagement.sln" }
 $solutionArray += [PsObject]@{ File = $rootFolder + "/../aspnet-core/LINGYUN.MicroService.Workflow.sln" }
 $solutionArray += [PsObject]@{ File = $rootFolder + "/../aspnet-core/LINGYUN.MicroService.SingleProject.sln" }
+$solutionArray += [PsObject]@{ File = $rootFolder + "/../aspnet-core/LINGYUN.MicroService.WechatManagement.sln" }
 $solutionArray += [PsObject]@{ File = $rootFolder + "/../gateways/internal/LINGYUN.MicroService.Internal.ApiGateway/LINGYUN.MicroService.Internal.ApiGateway.sln" }
 
 [PsObject[]]$migrationArray = @()
-$migrationArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/migrations/LY.MicroService.BackendAdmin.DbMigrator" }
 $migrationArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/migrations/LY.MicroService.Platform.DbMigrator" }
 $migrationArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/migrations/LY.MicroService.LocalizationManagement.DbMigrator" }
 $migrationArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/migrations/LY.MicroService.RealtimeMessage.DbMigrator" }
@@ -36,6 +37,7 @@ $migrationArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/migrations
 $migrationArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/migrations/LY.MicroService.TaskManagement.DbMigrator" }
 $migrationArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/migrations/LY.MicroService.AuthServer.DbMigrator" }
 $migrationArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/migrations/LY.MicroService.WebhooksManagement.DbMigrator" }
+$migrationArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/migrations/LY.MicroService.BackendAdmin.DbMigrator" }
 #$migrationArray += [PsObject]@{ Path = $rootFolder + "/../aspnet-core/migrations/LY.MicroService.Applications.Single.DbMigrator" }
 
 Write-host ""

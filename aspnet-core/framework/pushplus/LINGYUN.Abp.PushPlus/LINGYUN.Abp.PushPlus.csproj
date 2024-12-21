@@ -1,10 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\..\configureawait.props" />
-	<Import Project="..\..\..\common.props" />
+	<Import Project="..\..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\common.props" />
 
 	<PropertyGroup>
-		<TargetFramework>netstandard2.0</TargetFramework>
+		<TargetFrameworks>netstandard2.0;netstandard2.1;net8.0</TargetFrameworks>
+		<AssemblyName>LINGYUN.Abp.PushPlus</AssemblyName>
+		<PackageId>LINGYUN.Abp.PushPlus</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
 		<RootNamespace />
 	</PropertyGroup>
 
@@ -17,9 +22,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Volo.Abp.Caching" Version="$(VoloAbpPackageVersion)" />
-		<PackageReference Include="Newtonsoft.Json" Version="$(NewtonsoftJsonPackageVersion)" />
-		<PackageReference Include="Microsoft.Extensions.Http" Version="$(MicrosoftPackageVersion)" />
+		<PackageReference Include="Volo.Abp.Caching" />
+		<PackageReference Include="Newtonsoft.Json" />
+		<PackageReference Include="Microsoft.Extensions.Http" />
 	</ItemGroup>
 
 	<ItemGroup>

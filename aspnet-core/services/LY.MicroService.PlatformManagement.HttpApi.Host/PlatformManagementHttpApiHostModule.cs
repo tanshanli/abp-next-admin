@@ -3,23 +3,23 @@ using LINGYUN.Abp.AspNetCore.Mvc.Localization;
 using LINGYUN.Abp.AspNetCore.Mvc.Wrapper;
 using LINGYUN.Abp.AuditLogging.Elasticsearch;
 using LINGYUN.Abp.Authorization.OrganizationUnits;
+using LINGYUN.Abp.Claims.Mapping;
 using LINGYUN.Abp.Data.DbMigrator;
 using LINGYUN.Abp.EventBus.CAP;
 using LINGYUN.Abp.ExceptionHandling.Emailing;
 using LINGYUN.Abp.Features.LimitValidation.Redis;
-using LINGYUN.Abp.Http.Client.Wrapper;
+using LINGYUN.Abp.Identity.Session.AspNetCore;
 using LINGYUN.Abp.Localization.CultureMap;
 using LINGYUN.Abp.LocalizationManagement.EntityFrameworkCore;
 using LINGYUN.Abp.Notifications;
 using LINGYUN.Abp.OssManagement;
 using LINGYUN.Abp.OssManagement.FileSystem;
-using LINGYUN.Abp.OssManagement.FileSystem.ImageSharp;
+using LINGYUN.Abp.OssManagement.Imaging;
 using LINGYUN.Abp.OssManagement.SettingManagement;
 using LINGYUN.Abp.Saas.EntityFrameworkCore;
 using LINGYUN.Abp.Serilog.Enrichers.Application;
 using LINGYUN.Abp.Serilog.Enrichers.UniqueId;
 using LINGYUN.Abp.UI.Navigation.VueVbenAdmin;
-using LINGYUN.Abp.WeChat.Work;
 using LINGYUN.Platform;
 using LINGYUN.Platform.EntityFrameworkCore;
 using LINGYUN.Platform.HttpApi;
@@ -41,8 +41,11 @@ using Volo.Abp.BackgroundWorkers;
 using Volo.Abp.BlobStoring;
 using Volo.Abp.Caching.StackExchangeRedis;
 using Volo.Abp.FeatureManagement.EntityFrameworkCore;
+using Volo.Abp.Http.Client;
 using Volo.Abp.Http.Client.IdentityModel.Web;
 using Volo.Abp.Identity;
+using Volo.Abp.Imaging;
+using Volo.Abp.MailKit;
 using Volo.Abp.Modularity;
 using Volo.Abp.PermissionManagement.EntityFrameworkCore;
 using Volo.Abp.SettingManagement.EntityFrameworkCore;
@@ -61,15 +64,14 @@ namespace LY.MicroService.PlatformManagement;
     typeof(PlatformThemeVueVbenAdminModule),
     // typeof(AbpOssManagementAliyunModule),
     typeof(AbpOssManagementFileSystemModule),           // 本地文件系统提供者模块
-    typeof(AbpOssManagementFileSystemImageSharpModule), // 本地文件系统图形处理模块
+    typeof(AbpOssManagementImagingModule), // 本地文件系统图形处理模块
     typeof(AbpOssManagementApplicationModule),
     typeof(AbpOssManagementHttpApiModule),
     typeof(AbpOssManagementSettingManagementModule),
+    typeof(AbpImagingImageSharpModule),
     typeof(PlatformApplicationModule),
     typeof(PlatformHttpApiModule),
     typeof(PlatformEntityFrameworkCoreModule),
-    typeof(AbpWeChatWorkApplicationModule),
-    typeof(AbpWeChatWorkHttpApiModule),
     typeof(AbpIdentityHttpApiClientModule),
     typeof(AbpHttpClientIdentityModelWebModule),
     typeof(AbpFeatureManagementEntityFrameworkCoreModule),
@@ -88,10 +90,13 @@ namespace LY.MicroService.PlatformManagement;
     // typeof(AbpFeaturesClientModule),// 当需要客户端特性限制时取消注释此模块
     // typeof(AbpFeaturesValidationRedisClientModule),// 当需要客户端特性限制时取消注释此模块
     typeof(AbpCachingStackExchangeRedisModule),
-    typeof(AbpAspNetCoreHttpOverridesModule),
     typeof(AbpLocalizationCultureMapModule),
-    typeof(AbpHttpClientWrapperModule),
+    typeof(AbpIdentitySessionAspNetCoreModule),
+    typeof(AbpHttpClientModule),
+    typeof(AbpMailKitModule),
     typeof(AbpAspNetCoreMvcWrapperModule),
+    typeof(AbpClaimsMappingModule),
+    typeof(AbpAspNetCoreHttpOverridesModule),
     typeof(AbpAutofacModule)
     )]
 public partial class PlatformManagementHttpApiHostModule : AbpModule
@@ -100,6 +105,7 @@ public partial class PlatformManagementHttpApiHostModule : AbpModule
     {
         var configuration = context.Services.GetConfiguration();
 
+        PreConfigureWrapper();
         PreForwardedHeaders();
         PreConfigureFeature();
         PreConfigureApp(configuration);
@@ -111,20 +117,24 @@ public partial class PlatformManagementHttpApiHostModule : AbpModule
         var hostingEnvironment = context.Services.GetHostingEnvironment();
         var configuration = context.Services.GetConfiguration();
 
-        ConfigureIdentity();
+        ConfigureWrapper();
         ConfigureDbContext();
         ConfigureBlobStoring();
         ConfigureLocalization();
         ConfigureKestrelServer();
-        ConfigreExceptionHandling();
+        ConfigureExceptionHandling();
         ConfigureVirtualFileSystem();
         ConfigureFeatureManagement();
+        ConfigureTiming(configuration);
         ConfigureCaching(configuration);
+        ConfigureIdentity(configuration);
         ConfigureAuditing(configuration);
         ConfigureSwagger(context.Services);
         ConfigureMultiTenancy(configuration);
         ConfigureJsonSerializer(configuration);
+        ConfigureMvc(context.Services, configuration);
         ConfigureCors(context.Services, configuration);
+        ConfigureOpenTelemetry(context.Services, configuration);
         ConfigureDistributedLocking(context.Services, configuration);
         ConfigureSeedWorker(context.Services, hostingEnvironment.IsDevelopment());
         ConfigureSecurity(context.Services, configuration, hostingEnvironment.IsDevelopment());
@@ -150,7 +160,10 @@ public partial class PlatformManagementHttpApiHostModule : AbpModule
     {
         var app = context.GetApplicationBuilder();
         var env = context.GetEnvironment();
+
         app.UseForwardedHeaders();
+        // 本地化
+        app.UseMapRequestLocalization();
         // http调用链
         app.UseCorrelationId();
         // 虚拟文件系统
@@ -161,15 +174,12 @@ public partial class PlatformManagementHttpApiHostModule : AbpModule
         app.UseCors(DefaultCorsPolicyName);
         // 认证
         app.UseAuthentication();
-        // IDS与JWT不匹配可能造成鉴权错误
-        // TODO: abp在某个更新版本建议移除此中间价
-        app.UseAbpClaimsMap();
-        // jwt
         app.UseJwtTokenMiddleware();
         // 多租户
         app.UseMultiTenancy();
-        // 本地化
-        app.UseMapRequestLocalization();
+        // 会话
+        app.UseAbpSession();
+        app.UseDynamicClaims();
         // 授权
         app.UseAuthorization();
         // Swagger

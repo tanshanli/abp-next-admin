@@ -14,11 +14,7 @@ using Microsoft.Extensions.Hosting;
 using PackageName.CompanyName.ProjectName.EntityFrameworkCore;
 using PackageName.CompanyName.ProjectName.SettingManagement;
 using Volo.Abp;
-#if IdentityServer4
 using Volo.Abp.AspNetCore.Authentication.JwtBearer;
-#elif OpenIddict 
-using Volo.Abp.OpenIddict;
-#endif
 using Volo.Abp.AspNetCore.MultiTenancy;
 using Volo.Abp.AspNetCore.Serilog;
 using Volo.Abp.Autofac;
@@ -30,6 +26,9 @@ using Volo.Abp.Modularity;
 using Volo.Abp.PermissionManagement.EntityFrameworkCore;
 using Volo.Abp.SettingManagement.EntityFrameworkCore;
 using Volo.Abp.Swashbuckle;
+using LINGYUN.Abp.AspNetCore.HttpOverrides;
+using LINGYUN.Abp.Identity.Session.AspNetCore;
+using Volo.Abp.MailKit;
 
 namespace PackageName.CompanyName.ProjectName;
 
@@ -52,14 +51,13 @@ namespace PackageName.CompanyName.ProjectName;
     typeof(AbpSettingManagementEntityFrameworkCoreModule),
     typeof(AbpLocalizationManagementEntityFrameworkCoreModule),
     typeof(AbpTextTemplatingEntityFrameworkCoreModule),
-#if IdentityServer4
     typeof(AbpAspNetCoreAuthenticationJwtBearerModule),
-#elif OpenIddict
-    typeof(AbpOpenIddictAspNetCoreModule),
-#endif
     typeof(AbpCachingStackExchangeRedisModule),
     typeof(AbpDistributedLockingModule),
     typeof(AbpAspNetCoreMvcWrapperModule),
+    typeof(AbpAspNetCoreHttpOverridesModule),
+    typeof(AbpIdentitySessionAspNetCoreModule),
+    typeof(AbpMailKitModule),
     typeof(AbpSwashbuckleModule),
     typeof(AbpAutofacModule)
     )]
@@ -70,6 +68,7 @@ public partial class ProjectNameHttpApiHostModule : AbpModule
         var configuration = context.Services.GetConfiguration();
 
         PreConfigureApp();
+        PreConfigureWrapper();
         PreConfigureFeature();
         PreConfigureCAP(configuration);
     }
@@ -85,9 +84,12 @@ public partial class ProjectNameHttpApiHostModule : AbpModule
         ConfigureVirtualFileSystem();
         ConfigureCaching(configuration);
         ConfigureAuditing(configuration);
+        ConfigureIdentity(configuration);
         ConfigureMultiTenancy(configuration);
-        ConfigureSwagger(context.Services);
         ConfigureJsonSerializer(configuration);
+        ConfigureSwagger(context.Services);
+        ConfigureMvc(context.Services, configuration);
+        ConfigureCors(context.Services, configuration);
         ConfigureOpenTelemetry(context.Services, configuration);
         ConfigureDistributedLock(context.Services, configuration);
         ConfigureSecurity(context.Services, configuration, hostingEnvironment.IsDevelopment());
@@ -98,18 +100,17 @@ public partial class ProjectNameHttpApiHostModule : AbpModule
         var app = context.GetApplicationBuilder();
         var env = context.GetEnvironment();
 
+        app.UseForwardedHeaders();
         app.UseMapRequestLocalization();
         app.UseCorrelationId();
         app.UseStaticFiles();
         app.UseRouting();
         app.UseCors();
         app.UseAuthentication();
-#if IdentityServer4
         app.UseJwtTokenMiddleware();
-#elif OpenIddict
-        app.UseAbpOpenIddictValidation();
-#endif
         app.UseMultiTenancy();
+        app.UseAbpSession();
+        app.UseDynamicClaims();
         app.UseAuthorization();
         app.UseSwagger();
         app.UseAbpSwaggerUI(options =>

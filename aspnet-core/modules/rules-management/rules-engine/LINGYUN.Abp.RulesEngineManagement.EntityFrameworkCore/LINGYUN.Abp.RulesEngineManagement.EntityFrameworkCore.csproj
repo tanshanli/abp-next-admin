@@ -1,15 +1,20 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\..\..\configureawait.props" />
-	<Import Project="..\..\..\..\common.props" />
+	<Import Project="..\..\..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\..\common.props" />
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
+		<AssemblyName>LINGYUN.Abp.RulesEngineManagement.EntityFrameworkCore</AssemblyName>
+		<PackageId>LINGYUN.Abp.RulesEngineManagement.EntityFrameworkCore</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
 		<RootNamespace />
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Volo.Abp.EntityFrameworkCore" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Volo.Abp.EntityFrameworkCore" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using LINGYUN.Abp.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Volo.Abp.Authorization.Permissions;
 using Volo.Abp.Data;
+using Volo.Abp.DistributedLocking;
 using Volo.Abp.EntityFrameworkCore.Migrations;
 using Volo.Abp.EventBus.Distributed;
 using Volo.Abp.Guids;
@@ -12,6 +14,7 @@ using Volo.Abp.Identity;
 using Volo.Abp.MultiTenancy;
 using Volo.Abp.PermissionManagement;
 using Volo.Abp.Uow;
+using IdentityPermissions = Volo.Abp.Identity.IdentityPermissions;
 
 namespace LY.MicroService.AuthServer.EntityFrameworkCore;
 
@@ -26,6 +29,7 @@ public class AuthServerDbMigrationEventHandler : EfCoreDatabaseMigrationEventHan
         ICurrentTenant currentTenant,
         IUnitOfWorkManager unitOfWorkManager,
         ITenantStore tenantStore,
+        IAbpDistributedLock abpDistributedLock,
         IDistributedEventBus distributedEventBus,
         ILoggerFactory loggerFactory,
         IGuidGenerator guidGenerator,
@@ -34,7 +38,7 @@ public class AuthServerDbMigrationEventHandler : EfCoreDatabaseMigrationEventHan
         IPermissionDataSeeder permissionDataSeeder) 
         : base(
             ConnectionStringNameAttribute.GetConnStringName<AuthServerMigrationsDbContext>(), 
-            currentTenant, unitOfWorkManager, tenantStore, distributedEventBus, loggerFactory)
+            currentTenant, unitOfWorkManager, tenantStore, abpDistributedLock, distributedEventBus, loggerFactory)
     {
         GuidGenerator = guidGenerator;
         IdentityUserManager = identityUserManager;

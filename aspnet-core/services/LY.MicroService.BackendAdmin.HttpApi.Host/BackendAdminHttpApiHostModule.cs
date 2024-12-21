@@ -1,20 +1,24 @@
-﻿using LINGYUN.Abp.AspNetCore.HttpOverrides;
+﻿using LINGYUN.Abp.Aliyun.SettingManagement;
+using LINGYUN.Abp.AspNetCore.HttpOverrides;
 using LINGYUN.Abp.AspNetCore.Mvc.Localization;
 using LINGYUN.Abp.AspNetCore.Mvc.Wrapper;
 using LINGYUN.Abp.Auditing;
 using LINGYUN.Abp.AuditLogging.Elasticsearch;
 using LINGYUN.Abp.CachingManagement;
 using LINGYUN.Abp.CachingManagement.StackExchangeRedis;
+using LINGYUN.Abp.Claims.Mapping;
 using LINGYUN.Abp.Data.DbMigrator;
+using LINGYUN.Abp.DataProtectionManagement;
 using LINGYUN.Abp.EventBus.CAP;
 using LINGYUN.Abp.ExceptionHandling.Emailing;
 using LINGYUN.Abp.FeatureManagement;
 using LINGYUN.Abp.FeatureManagement.HttpApi;
-using LINGYUN.Abp.Http.Client.Wrapper;
 using LINGYUN.Abp.Identity.EntityFrameworkCore;
+using LINGYUN.Abp.Identity.Session.AspNetCore;
 using LINGYUN.Abp.Localization.CultureMap;
 using LINGYUN.Abp.LocalizationManagement.EntityFrameworkCore;
 using LINGYUN.Abp.Logging.Serilog.Elasticsearch;
+using LINGYUN.Abp.OssManagement.SettingManagement;
 using LINGYUN.Abp.PermissionManagement;
 using LINGYUN.Abp.PermissionManagement.HttpApi;
 using LINGYUN.Abp.PermissionManagement.OrganizationUnits;
@@ -24,8 +28,11 @@ using LINGYUN.Abp.Serilog.Enrichers.Application;
 using LINGYUN.Abp.Serilog.Enrichers.UniqueId;
 using LINGYUN.Abp.SettingManagement;
 using LINGYUN.Abp.Sms.Aliyun;
+using LINGYUN.Abp.Tencent.SettingManagement;
 using LINGYUN.Abp.TextTemplating;
 using LINGYUN.Abp.TextTemplating.EntityFrameworkCore;
+using LINGYUN.Abp.TextTemplating.Scriban;
+using LINGYUN.Abp.WxPusher.SettingManagement;
 using LY.MicroService.BackendAdmin.EntityFrameworkCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -39,7 +46,9 @@ using Volo.Abp.Autofac;
 using Volo.Abp.Caching.StackExchangeRedis;
 using Volo.Abp.EntityFrameworkCore.MySQL;
 using Volo.Abp.FeatureManagement.EntityFrameworkCore;
+using Volo.Abp.Http.Client;
 using Volo.Abp.IdentityServer.EntityFrameworkCore;
+using Volo.Abp.MailKit;
 using Volo.Abp.Modularity;
 using Volo.Abp.PermissionManagement.EntityFrameworkCore;
 using Volo.Abp.PermissionManagement.Identity;
@@ -49,6 +58,7 @@ using Volo.Abp.SettingManagement.EntityFrameworkCore;
 namespace LY.MicroService.BackendAdmin;
 
 [DependsOn(
+    typeof(AbpCAPEventBusModule),
     typeof(AbpSerilogEnrichersApplicationModule),
     typeof(AbpSerilogEnrichersUniqueIdModule),
     typeof(AbpAspNetCoreSerilogModule),
@@ -56,10 +66,20 @@ namespace LY.MicroService.BackendAdmin;
     typeof(AbpAuditLoggingElasticsearchModule),
     typeof(AbpAspNetCoreMvcUiMultiTenancyModule),
     typeof(AbpAspNetCoreMvcLocalizationModule),
+
+    // 设置管理
+    typeof(AbpAliyunSettingManagementModule),
+    typeof(AbpTencentCloudSettingManagementModule),
+    // typeof(AbpWeChatSettingManagementModule),
+    typeof(AbpWxPusherSettingManagementModule),
+    typeof(AbpOssManagementSettingManagementModule),
+
     typeof(AbpSettingManagementApplicationModule),
     typeof(AbpSettingManagementHttpApiModule),
     typeof(AbpPermissionManagementApplicationModule),
     typeof(AbpPermissionManagementHttpApiModule),
+    typeof(AbpDataProtectionManagementApplicationModule),
+    typeof(AbpDataProtectionManagementHttpApiModule),
     typeof(AbpFeatureManagementApplicationModule),
     typeof(AbpFeatureManagementHttpApiModule),
     typeof(AbpFeatureManagementClientModule),
@@ -84,17 +104,24 @@ namespace LY.MicroService.BackendAdmin;
     typeof(AbpFeatureManagementEntityFrameworkCoreModule),
     typeof(AbpLocalizationManagementEntityFrameworkCoreModule),
     typeof(AbpTextTemplatingEntityFrameworkCoreModule),
+
+    // 重写模板引擎支持外部本地化
+    typeof(AbpTextTemplatingScribanModule),
+
+    typeof(AbpIdentitySessionAspNetCoreModule),
+
     typeof(BackendAdminMigrationsEntityFrameworkCoreModule),
     typeof(AbpDataDbMigratorModule),
     typeof(AbpAspNetCoreAuthenticationJwtBearerModule),
     typeof(AbpEmailingExceptionHandlingModule),
-    typeof(AbpCAPEventBusModule),
+    typeof(AbpHttpClientModule),
+    typeof(AbpMailKitModule),
     typeof(AbpAliyunSmsModule),
     typeof(AbpCachingStackExchangeRedisModule),
-    typeof(AbpAspNetCoreHttpOverridesModule),
     typeof(AbpLocalizationCultureMapModule),
-    typeof(AbpHttpClientWrapperModule),
     typeof(AbpAspNetCoreMvcWrapperModule),
+    typeof(AbpAspNetCoreHttpOverridesModule),
+    typeof(AbpClaimsMappingModule),
     typeof(AbpAutofacModule)
     )]
 public partial class BackendAdminHttpApiHostModule : AbpModule
@@ -103,6 +130,7 @@ public partial class BackendAdminHttpApiHostModule : AbpModule
     {
         var configuration = context.Services.GetConfiguration();
 
+        PreConfigureWrapper();
         PreConfigureFeature();
         PreConfigureApp(configuration);
         PreConfigureCAP(configuration);
@@ -113,6 +141,7 @@ public partial class BackendAdminHttpApiHostModule : AbpModule
         var hostingEnvironment = context.Services.GetHostingEnvironment();
         var configuration = context.Services.GetConfiguration();
 
+        ConfigureWrapper();
         ConfigureDbContext();
         ConfigureLocalization();
         ConfigureExceptionHandling();
@@ -121,13 +150,17 @@ public partial class BackendAdminHttpApiHostModule : AbpModule
         ConfigureSettingManagement();
         ConfigureFeatureManagement();
         ConfigurePermissionManagement();
+        ConfigureDataProtectedManagement();
         ConfigureIdentity(configuration);
+        ConfigureTiming(configuration);
         ConfigureCaching(configuration);
         ConfigureAuditing(configuration);
         ConfigureSwagger(context.Services);
         ConfigureMultiTenancy(configuration);
         ConfigureJsonSerializer(configuration);
+        ConfigureMvc(context.Services, configuration);
         ConfigureCors(context.Services, configuration);
+        ConfigureOpenTelemetry(context.Services, configuration);
         ConfigureDistributedLocking(context.Services, configuration);
         ConfigureSeedWorker(context.Services, hostingEnvironment.IsDevelopment());
         ConfigureSecurity(context.Services, configuration, hostingEnvironment.IsDevelopment());
@@ -136,6 +169,7 @@ public partial class BackendAdminHttpApiHostModule : AbpModule
     public override void OnApplicationInitialization(ApplicationInitializationContext context)
     {
         var app = context.GetApplicationBuilder();
+        app.UseForwardedHeaders();
         // 本地化
         app.UseMapRequestLocalization();
         // http调用链
@@ -148,10 +182,13 @@ public partial class BackendAdminHttpApiHostModule : AbpModule
         app.UseCors(DefaultCorsPolicyName);
         // 认证
         app.UseAuthentication();
-        // jwt
-        app.UseDynamicClaims();
+        app.UseJwtTokenMiddleware();
         // 多租户
         app.UseMultiTenancy();
+        // 会话
+        app.UseAbpSession();
+        // jwt
+        app.UseDynamicClaims();
         // 授权
         app.UseAuthorization();
         // Swagger

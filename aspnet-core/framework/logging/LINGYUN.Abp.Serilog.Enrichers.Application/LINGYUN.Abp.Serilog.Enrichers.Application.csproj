@@ -1,16 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-	<Import Project="..\..\..\configureawait.props" />
-	<Import Project="..\..\..\common.props" />
+	<Import Project="..\..\..\..\configureawait.props" />
+	<Import Project="..\..\..\..\common.props" />
 
 	<PropertyGroup>
-		<TargetFramework>netstandard2.0</TargetFramework>
+		<TargetFrameworks>netstandard2.0;netstandard2.1;net8.0</TargetFrameworks>
+		<AssemblyName>LINGYUN.Abp.Serilog.Enrichers.Application</AssemblyName>
+		<PackageId>LINGYUN.Abp.Serilog.Enrichers.Application</PackageId>
+		<GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+		<GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+		<GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
 		<RootNamespace />
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Serilog" Version="$(SerilogPackageVersion)" />
-		<PackageReference Include="Volo.Abp.Core" Version="$(VoloAbpPackageVersion)" />
+		<PackageReference Include="Serilog" />
+		<PackageReference Include="Volo.Abp.Core" />
 	</ItemGroup>
 
 </Project>

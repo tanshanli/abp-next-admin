@@ -17,23 +17,22 @@
       </template>
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'displayName'">
-          <span>{{ getGroupDisplayName(record.displayName) }}</span>
+          <span>{{ getDisplayName(record.displayName) }}</span>
         </template>
       </template>
       <template #expandedRowRender="{ record }">
         <BasicTable @register="registerSubTable" :data-source="record.permissions">
           <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'groupName'">
-              <span>{{ getGroupDisplayName(record.groupName) }}</span>
-            </template>
-            <template v-else-if="column.key === 'displayName'">
+            <template v-if="column.key === 'displayName'">
               <span>{{ getDisplayName(record.displayName) }}</span>
             </template>
             <template v-else-if="column.key === 'multiTenancySide'">
               <Tag color="blue">{{ multiTenancySidesMap[record.multiTenancySide] }}</Tag>
             </template>
             <template v-else-if="column.key === 'providers'">
-              <Tag v-for="provider in record.providers" color="blue" style="margin: 5px;">{{ providersMap[provider] }}</Tag>
+              <Tag v-for="provider in record.providers" color="blue" style="margin: 5px">{{
+                providersMap[provider]
+              }}</Tag>
             </template>
             <template v-else-if="column.key === 'isEnabled'">
               <CheckOutlined v-if="record.isEnabled" class="enable" />
@@ -85,11 +84,13 @@
   import { useLocalizationSerializer } from '/@/hooks/abp/useLocalizationSerializer';
   import { GetListAsyncByInput as getGroupDefinitions } from '/@/api/permission-management/definitions/groups';
   import { PermissionGroupDefinitionDto } from '/@/api/permission-management/definitions/groups/model';
-  import { GetListAsyncByInput, DeleteAsyncByName } from '/@/api/permission-management/definitions/permissions';
+  import {
+    GetListAsyncByInput,
+    DeleteAsyncByName,
+  } from '/@/api/permission-management/definitions/permissions';
   import { multiTenancySidesMap, providersMap } from '../../typing';
   import { getSearchFormSchemas } from '../datas/ModalData';
   import { listToTree } from '/@/utils/helper/treeHelper';
-  import { groupBy } from '/@/utils/array';
   import { sorter } from '/@/utils/table';
   import PermissionDefinitionModal from './PermissionDefinitionModal.vue';
 
@@ -175,14 +176,6 @@
       };
     });
   });
-  const getGroupDisplayName = computed(() => {
-    return (groupName: string) => {
-      const group = state.groups.find(x => x.name === groupName);
-      if (!group) return groupName;
-      const info = deserialize(group.displayName);
-      return Lr(info.resourceName, info.name);
-    };
-  });
   const getDisplayName = computed(() => {
     return (displayName?: string) => {
       if (!displayName) return displayName;
@@ -192,8 +185,7 @@
   });
 
   onMounted(() => {
-    fetch();
-    fetchGroups();
+    fetchGroups().then(fetch);
   });
 
   function fetch() {
@@ -202,33 +194,34 @@
       setLoading(true);
       setTableData([]);
       var input = form.getFieldsValue();
-      GetListAsyncByInput(input).then((res) => {
-        const permissionGroup = groupBy(res.items, 'groupName');
-        const permissionGroupData: PermissionGroup[] = [];
-        Object.keys(permissionGroup).forEach((gk) => {
-          const groupData: PermissionGroup = {
-            name: gk,
-            displayName: gk,
-            permissions: [],
-          };
-          const permissionTree = listToTree(permissionGroup[gk], {
-            id: 'name',
-            pid: 'parentName',
+      GetListAsyncByInput(input)
+        .then((res) => {
+          const permissionGroupData: PermissionGroup[] = [];
+          state.groups.forEach((group) => {
+            const groupData: PermissionGroup = {
+              name: group.name,
+              displayName: group.displayName,
+              permissions: [],
+            };
+            const permissionTree = listToTree(res.items.filter((item) => item.groupName === group.name), {
+              id: 'name',
+              pid: 'parentName',
+            });
+            permissionTree.forEach((tk) => {
+              groupData.permissions.push(tk);
+            });
+            permissionGroupData.push(groupData);
           });
-          permissionTree.forEach((tk) => {
-            groupData.permissions.push(tk);
-          });
-          permissionGroupData.push(groupData);
+          setTableData(permissionGroupData);
+        })
+        .finally(() => {
+          setLoading(false);
         });
-        setTableData(permissionGroupData);
-      }).finally(() => {
-        setLoading(false);
-      });
     });
   }
 
   function fetchGroups() {
-    getGroupDefinitions({}).then((res) => {
+    return getGroupDefinitions({}).then((res) => {
       state.groups = res.items;
     });
   }

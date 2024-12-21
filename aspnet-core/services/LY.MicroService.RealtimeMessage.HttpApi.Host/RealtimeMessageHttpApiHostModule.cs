@@ -6,12 +6,14 @@ using LINGYUN.Abp.Authorization.OrganizationUnits;
 using LINGYUN.Abp.BackgroundTasks.DistributedLocking;
 using LINGYUN.Abp.BackgroundTasks.ExceptionHandling;
 using LINGYUN.Abp.BackgroundTasks.Quartz;
+using LINGYUN.Abp.Claims.Mapping;
 using LINGYUN.Abp.Data.DbMigrator;
 using LINGYUN.Abp.EventBus.CAP;
 using LINGYUN.Abp.ExceptionHandling.Notifications;
 using LINGYUN.Abp.Features.LimitValidation.Redis;
-using LINGYUN.Abp.Http.Client.Wrapper;
 using LINGYUN.Abp.Identity.EntityFrameworkCore;
+using LINGYUN.Abp.Identity.Notifications;
+using LINGYUN.Abp.Identity.Session.AspNetCore;
 using LINGYUN.Abp.Identity.WeChat;
 using LINGYUN.Abp.Identity.WeChat.Work;
 using LINGYUN.Abp.IM.SignalR;
@@ -34,6 +36,9 @@ using LINGYUN.Abp.Serilog.Enrichers.Application;
 using LINGYUN.Abp.Serilog.Enrichers.UniqueId;
 using LINGYUN.Abp.TaskManagement.EntityFrameworkCore;
 using LINGYUN.Abp.TextTemplating.EntityFrameworkCore;
+using LINGYUN.Abp.TextTemplating.Scriban;
+using LINGYUN.Abp.WeChat.Official.Handlers;
+using LINGYUN.Abp.WeChat.Work.Handlers;
 using LY.MicroService.RealtimeMessage.EntityFrameworkCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -47,10 +52,11 @@ using Volo.Abp.Autofac;
 using Volo.Abp.BackgroundWorkers;
 using Volo.Abp.Caching.StackExchangeRedis;
 using Volo.Abp.FeatureManagement.EntityFrameworkCore;
+using Volo.Abp.Http.Client;
+using Volo.Abp.MailKit;
 using Volo.Abp.Modularity;
 using Volo.Abp.PermissionManagement.EntityFrameworkCore;
 using Volo.Abp.SettingManagement.EntityFrameworkCore;
-using Volo.Abp.TextTemplating.Scriban;
 
 namespace LY.MicroService.RealtimeMessage;
 
@@ -95,14 +101,23 @@ namespace LY.MicroService.RealtimeMessage;
     typeof(AbpNotificationsWeChatMiniProgramModule),
     typeof(AbpNotificationsWeChatWorkModule),
     typeof(AbpNotificationsExceptionHandlingModule),
+    typeof(AbpWeChatWorkHandlersModule),
+    typeof(AbpWeChatOfficialHandlersModule),
+    typeof(AbpIdentityNotificationsModule),
+
+    // 重写模板引擎支持外部本地化
     typeof(AbpTextTemplatingScribanModule),
+
     typeof(AbpCAPEventBusModule),
     typeof(AbpFeaturesValidationRedisModule),
     typeof(AbpCachingStackExchangeRedisModule),
-    typeof(AbpAspNetCoreHttpOverridesModule),
     typeof(AbpLocalizationCultureMapModule),
-    typeof(AbpHttpClientWrapperModule),
+    typeof(AbpIdentitySessionAspNetCoreModule),
+    typeof(AbpHttpClientModule),
+    typeof(AbpMailKitModule),
+    typeof(AbpClaimsMappingModule),
     typeof(AbpAspNetCoreMvcWrapperModule),
+    typeof(AbpAspNetCoreHttpOverridesModule),
     typeof(AbpAutofacModule)
     )]
 public partial class RealtimeMessageHttpApiHostModule : AbpModule
@@ -113,6 +128,7 @@ public partial class RealtimeMessageHttpApiHostModule : AbpModule
     {
         var configuration = context.Services.GetConfiguration();
 
+        PreConfigureWrapper();
         PreConfigureFeature();
         PreForwardedHeaders();
         PreConfigureApp(configuration);
@@ -126,20 +142,25 @@ public partial class RealtimeMessageHttpApiHostModule : AbpModule
         var hostingEnvironment = context.Services.GetHostingEnvironment();
         var configuration = context.Services.GetConfiguration();
 
-        ConfigureIdentity();
+        ConfigureWrapper();
         ConfigureDbContext();
         ConfigureLocalization();
         ConfigureNotifications();
-        ConfigureBackgroundTasks();
-        ConfigreExceptionHandling();
+        ConfigureTextTemplating();
+        ConfigureExceptionHandling();
         ConfigureVirtualFileSystem();
         ConfigureFeatureManagement();
+        ConfigureTiming(configuration);
         ConfigureCaching(configuration);
         ConfigureAuditing(configuration);
-        ConfigureSwagger(context.Services);
+        ConfigureIdentity(configuration);
         ConfigureMultiTenancy(configuration);
         ConfigureJsonSerializer(configuration);
+        ConfigureBackgroundTasks(configuration);
+        ConfigureSwagger(context.Services);
+        ConfigureMvc(context.Services, configuration);
         ConfigureCors(context.Services, configuration);
+        ConfigureOpenTelemetry(context.Services, configuration);
         ConfigureDistributedLocking(context.Services, configuration);
         ConfigureSeedWorker(context.Services, hostingEnvironment.IsDevelopment());
         ConfigureSecurity(context.Services, configuration, hostingEnvironment.IsDevelopment());
@@ -149,6 +170,8 @@ public partial class RealtimeMessageHttpApiHostModule : AbpModule
     {
         var app = context.GetApplicationBuilder();
         app.UseForwardedHeaders();
+        // 本地化
+        app.UseMapRequestLocalization();
         // http调用链
         app.UseCorrelationId();
         // 虚拟文件系统
@@ -159,13 +182,12 @@ public partial class RealtimeMessageHttpApiHostModule : AbpModule
         app.UseCors(DefaultCorsPolicyName);
         // 认证
         app.UseAuthentication();
-        app.UseAbpClaimsMap();
-        // jwt
         app.UseJwtTokenMiddleware();
         // 多租户
         app.UseMultiTenancy();
-        // 本地化
-        app.UseMapRequestLocalization();
+        // 会话
+        app.UseAbpSession();
+        app.UseDynamicClaims();
         // 授权
         app.UseAuthorization();
         // Swagger

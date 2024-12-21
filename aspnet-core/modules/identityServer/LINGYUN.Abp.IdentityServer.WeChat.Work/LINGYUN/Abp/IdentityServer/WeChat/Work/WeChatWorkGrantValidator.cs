@@ -64,6 +64,7 @@ public class WeChatWorkGrantValidator : IExtensionGrantValidator
     public async virtual Task ValidateAsync(ExtensionGrantValidationContext context)
     {
         var raw = context.Request.Raw;
+        var clientId = raw.Get(OidcConstants.TokenRequest.ClientId);
         var credential = raw.Get(OidcConstants.TokenRequest.GrantType);
         if (credential == null || !credential.Equals(GrantType))
         {
@@ -92,7 +93,7 @@ public class WeChatWorkGrantValidator : IExtensionGrantValidator
                 if (!await SettingProvider.IsTrueAsync("Abp.Account.IsSelfRegistrationEnabled") ||
                     !await SettingProvider.IsTrueAsync(WeChatWorkSettingNames.EnabledQuickLogin))
                 {
-                    Logger.LogWarning("Invalid grant type: wechat work user not register", userInfo.UserId);
+                    Logger.LogWarning("Invalid grant type: wechat work user {userId} not register", userInfo.UserId);
                     context.Result = new GrantValidationResult(TokenRequestErrors.InvalidGrant, WeChatWorkLocalizer["InvalidGrant:UserIdNotRegister"]);
 
                     return;
@@ -121,7 +122,7 @@ public class WeChatWorkGrantValidator : IExtensionGrantValidator
                 return;
             }
 
-            await EventService.RaiseAsync(new UserLoginSuccessEvent(AbpWeChatWorkGlobalConsts.ProviderName, userInfo.UserId, null));
+            await EventService.RaiseAsync(new UserLoginSuccessEvent(currentUser.UserName, currentUser.Id.ToString(), currentUser.Name, clientId: clientId));
 
             await SetSuccessResultAsync(context, currentUser);
         }

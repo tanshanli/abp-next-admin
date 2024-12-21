@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using LINGYUN.Abp.Saas.Features;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,15 +20,18 @@ public class TenantAppService : AbpSaasAppServiceBase, ITenantAppService
     protected IDistributedEventBus EventBus { get; }
     protected ITenantRepository TenantRepository { get; }
     protected ITenantManager TenantManager { get; }
+    protected IConnectionStringChecker ConnectionStringChecker { get; }
 
     public TenantAppService(
         ITenantRepository tenantRepository,
         ITenantManager tenantManager,
-        IDistributedEventBus eventBus)
+        IDistributedEventBus eventBus,
+        IConnectionStringChecker connectionStringChecker)
     {
         EventBus = eventBus;
         TenantRepository = tenantRepository;
         TenantManager = tenantManager;
+        ConnectionStringChecker = connectionStringChecker;
     }
 
     public async virtual Task<TenantDto> GetAsync(Guid id)
@@ -34,7 +39,8 @@ public class TenantAppService : AbpSaasAppServiceBase, ITenantAppService
         var tenant = await TenantRepository.FindAsync(id);
         if (tenant == null)
         {
-            throw new UserFriendlyException(L["TenantNotFoundById", id]);
+            throw new BusinessException(AbpSaasErrorCodes.TenantIdOrNameNotFound)
+                .WithData("Tenant", id);
         }
 
         return ObjectMapper.Map<Tenant, TenantDto>(tenant);
@@ -45,7 +51,8 @@ public class TenantAppService : AbpSaasAppServiceBase, ITenantAppService
         var tenant = await TenantRepository.FindByNameAsync(name);
         if (tenant == null)
         {
-            throw new UserFriendlyException(L["TenantNotFoundByName", name]);
+            throw new BusinessException(AbpSaasErrorCodes.TenantIdOrNameNotFound)
+                .WithData("Tenant", name);
         }
         return ObjectMapper.Map<Tenant, TenantDto>(tenant);
     }
@@ -78,6 +85,7 @@ public class TenantAppService : AbpSaasAppServiceBase, ITenantAppService
 
         if (!input.UseSharedDatabase && !input.DefaultConnectionString.IsNullOrWhiteSpace())
         {
+            await CheckConnectionString(input.DefaultConnectionString);
             tenant.SetDefaultConnectionString(input.DefaultConnectionString);
         }
 
@@ -85,6 +93,7 @@ public class TenantAppService : AbpSaasAppServiceBase, ITenantAppService
         {
             foreach (var connectionString in input.ConnectionStrings)
             {
+                await CheckConnectionString(connectionString.Value, connectionString.Key);
                 tenant.SetConnectionString(connectionString.Key, connectionString.Value);
             }
         }
@@ -116,6 +125,7 @@ public class TenantAppService : AbpSaasAppServiceBase, ITenantAppService
             ///
             await EventBus.PublishAsync(eto);
         });
+
 
         await CurrentUnitOfWork.SaveChangesAsync();
 
@@ -153,6 +163,27 @@ public class TenantAppService : AbpSaasAppServiceBase, ITenantAppService
         {
             return;
         }
+
+        // 租户删除时查询会失效, 在删除前确认
+        var recycleStrategy = RecycleStrategy.Recycle;
+        var strategySet = await FeatureChecker.GetOrNullAsync(SaasFeatureNames.Tenant.RecycleStrategy);
+        if (!strategySet.IsNullOrWhiteSpace() && Enum.TryParse<RecycleStrategy>(strategySet, out var strategy))
+        {
+            recycleStrategy = strategy;
+        }
+        var eto = new TenantDeletedEto
+        {
+            Id = tenant.Id,
+            Name = tenant.Name,
+            Strategy = recycleStrategy,
+            EntityVersion = tenant.EntityVersion,
+            DefaultConnectionString = tenant.FindDefaultConnectionString(),
+        };
+        CurrentUnitOfWork.OnCompleted(async () =>
+        {
+            await EventBus.PublishAsync(eto);
+        });
+
         await TenantRepository.DeleteAsync(tenant);
 
         await CurrentUnitOfWork.SaveChangesAsync();
@@ -184,6 +215,8 @@ public class TenantAppService : AbpSaasAppServiceBase, ITenantAppService
     [Authorize(AbpSaasPermissions.Tenants.ManageConnectionStrings)]
     public async virtual Task<TenantConnectionStringDto> SetConnectionStringAsync(Guid id, TenantConnectionStringCreateOrUpdate input)
     {
+        await CheckConnectionString(input.Value, input.Name);
+
         var tenant = await TenantRepository.GetAsync(id);
 
         var oldConnectionString = tenant.FindConnectionString(input.Name);
@@ -240,5 +273,35 @@ public class TenantAppService : AbpSaasAppServiceBase, ITenantAppService
         await TenantRepository.UpdateAsync(tenant);
 
         await CurrentUnitOfWork.SaveChangesAsync();
+    }
+
+    protected async virtual Task CheckConnectionString(string connectionString, string name = null)
+    {
+        try
+        {
+            var checkResult = await ConnectionStringChecker.CheckAsync(connectionString);
+            // 检查连接是否可用
+            if (!checkResult.Connected)
+            {
+                throw name.IsNullOrWhiteSpace()
+                    ? new BusinessException(AbpSaasErrorCodes.InvalidDefaultConnectionString)
+                    : new BusinessException(AbpSaasErrorCodes.InvalidConnectionString)
+                        .WithData("Name", name);
+            }
+            // 默认连接字符串改变不能影响到现有数据库
+            if (checkResult.DatabaseExists && name.IsNullOrWhiteSpace())
+            {
+                throw new BusinessException(AbpSaasErrorCodes.DefaultConnectionStringDatabaseExists);
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.LogWarning("An error occurred while checking the validity of the connection string");
+            Logger.LogWarning(e.Message);
+            throw name.IsNullOrWhiteSpace() 
+                ? new BusinessException(AbpSaasErrorCodes.InvalidDefaultConnectionString)
+                : new BusinessException(AbpSaasErrorCodes.InvalidConnectionString)
+                    .WithData("Name", name);
+        }
     }
 }
